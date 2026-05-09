@@ -151,6 +151,7 @@ internal static class LlmProviderSupport
             dbContext.LlmCallLogs.Add(new Core.Entities.LlmCallLog
             {
                 Id = Guid.NewGuid(),
+                UserId = request.UserId,
                 ProviderType = providerType,
                 Model = model,
                 SystemPrompt = systemPrompt,

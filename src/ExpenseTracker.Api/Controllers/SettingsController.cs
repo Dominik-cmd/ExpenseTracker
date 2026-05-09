@@ -19,7 +19,9 @@ public sealed class SettingsController(AppDbContext dbContext, ILogger<SettingsC
     {
         try
         {
-            var secret = await GetSettingAsync("sms_webhook_secret", ct);
+            var userId = GetCurrentUserId();
+            if (userId is null) return Unauthorized();
+            var secret = await GetSettingAsync("sms_webhook_secret", userId.Value, ct);
             return secret is null ? NotFound() : Ok(new { secret = secret.Value });
         }
         catch (Exception ex)
@@ -34,7 +36,9 @@ public sealed class SettingsController(AppDbContext dbContext, ILogger<SettingsC
     {
         try
         {
-            var setting = await GetSettingAsync("sms_webhook_secret", ct);
+            var userId = GetCurrentUserId();
+            if (userId is null) return Unauthorized();
+            var setting = await GetSettingAsync("sms_webhook_secret", userId.Value, ct);
             if (setting is null)
             {
                 return NotFound();
@@ -57,7 +61,9 @@ public sealed class SettingsController(AppDbContext dbContext, ILogger<SettingsC
     {
         try
         {
-            var setting = await GetSettingAsync("sms_senders", ct);
+            var userId = GetCurrentUserId();
+            if (userId is null) return Unauthorized();
+            var setting = await GetSettingAsync("sms_senders", userId.Value, ct);
             return setting is null || string.IsNullOrWhiteSpace(setting.Value)
                 ? NotFound()
                 : Ok(JsonSerializer.Deserialize<List<string>>(setting.Value) ?? []);
@@ -74,7 +80,9 @@ public sealed class SettingsController(AppDbContext dbContext, ILogger<SettingsC
     {
         try
         {
-            var setting = await GetSettingAsync("sms_senders", ct);
+            var userId = GetCurrentUserId();
+            if (userId is null) return Unauthorized();
+            var setting = await GetSettingAsync("sms_senders", userId.Value, ct);
             if (setting is null)
             {
                 return NotFound();
@@ -98,8 +106,8 @@ public sealed class SettingsController(AppDbContext dbContext, ILogger<SettingsC
         }
     }
 
-    private Task<ExpenseTracker.Core.Entities.Setting?> GetSettingAsync(string key, CancellationToken ct)
-        => dbContext.Settings.FirstOrDefaultAsync(x => x.Key == key, ct);
+    private Task<ExpenseTracker.Core.Entities.Setting?> GetSettingAsync(string key, Guid userId, CancellationToken ct)
+        => dbContext.Settings.FirstOrDefaultAsync(x => x.Key == key && x.UserId == userId, ct);
 
     private static string CreateUrlSafeSecret()
         => Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))

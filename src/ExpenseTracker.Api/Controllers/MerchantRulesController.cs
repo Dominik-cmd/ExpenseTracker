@@ -19,10 +19,14 @@ public sealed class MerchantRulesController(AppDbContext dbContext, ILogger<Merc
     {
         try
         {
+            var userId = GetCurrentUserId();
+            if (userId is null) return Unauthorized();
+
             var rules = await dbContext.MerchantRules
                 .AsNoTracking()
                 .Include(x => x.Category)
                 .ThenInclude(x => x.ParentCategory)
+                .Where(x => x.UserId == userId.Value)
                 .OrderBy(x => x.MerchantNormalized)
                 .ToListAsync(ct);
 
@@ -40,7 +44,10 @@ public sealed class MerchantRulesController(AppDbContext dbContext, ILogger<Merc
     {
         try
         {
-            var rule = await dbContext.MerchantRules.Include(x => x.Category).ThenInclude(x => x.ParentCategory).FirstOrDefaultAsync(x => x.Id == id, ct);
+            var userId = GetCurrentUserId();
+            if (userId is null) return Unauthorized();
+
+            var rule = await dbContext.MerchantRules.Include(x => x.Category).ThenInclude(x => x.ParentCategory).FirstOrDefaultAsync(x => x.Id == id && x.UserId == userId.Value, ct);
             if (rule is null) return NotFound();
             if (!await dbContext.Categories.AnyAsync(x => x.Id == request.CategoryId, ct)) return BadRequest(new { message = "Category does not exist." });
 
@@ -74,7 +81,10 @@ public sealed class MerchantRulesController(AppDbContext dbContext, ILogger<Merc
     {
         try
         {
-            var rule = await dbContext.MerchantRules.FirstOrDefaultAsync(x => x.Id == id, ct);
+            var userId = GetCurrentUserId();
+            if (userId is null) return Unauthorized();
+
+            var rule = await dbContext.MerchantRules.FirstOrDefaultAsync(x => x.Id == id && x.UserId == userId.Value, ct);
             if (rule is null) return NotFound();
             dbContext.MerchantRules.Remove(rule);
             await dbContext.SaveChangesAsync(ct);

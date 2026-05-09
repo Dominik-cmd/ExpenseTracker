@@ -89,13 +89,12 @@ public sealed class SmsProcessingBackgroundService(
                 return;
             }
 
-            var user = await dbContext.Users.OrderBy(x => x.CreatedAt).FirstOrDefaultAsync(ct)
-                ?? throw new InvalidOperationException("No user exists for transaction assignment.");
+            var userId = rawMessage.UserId;
 
-            var resolution = await ResolveCategoryAsync(dbContext, providerResolver, parsed, ct);
+            var resolution = await ResolveCategoryAsync(dbContext, providerResolver, parsed, userId, ct);
             var transaction = new Transaction
             {
-                UserId = user.Id,
+                UserId = userId,
                 Amount = parsed.Amount,
                 Currency = "EUR",
                 Direction = parsed.Direction,
@@ -119,7 +118,7 @@ public sealed class SmsProcessingBackgroundService(
 
             if (resolution.CreateRule && !string.IsNullOrWhiteSpace(parsed.MerchantNormalized))
             {
-                await UpsertMerchantRuleAsync(dbContext, parsed.MerchantNormalized, resolution.Category.Id, "llm", ct);
+                await UpsertMerchantRuleAsync(dbContext, parsed.MerchantNormalized, resolution.Category.Id, "llm", userId, ct);
             }
 
             await dbContext.SaveChangesAsync(ct);
@@ -134,13 +133,13 @@ public sealed class SmsProcessingBackgroundService(
         }
     }
 
-    private static async Task<CategoryResolution> ResolveCategoryAsync(AppDbContext dbContext, ILlmProviderResolver providerResolver, ParsedSms parsed, CancellationToken ct)
+    private static async Task<CategoryResolution> ResolveCategoryAsync(AppDbContext dbContext, ILlmProviderResolver providerResolver, ParsedSms parsed, Guid userId, CancellationToken ct)
     {
         if (!string.IsNullOrWhiteSpace(parsed.MerchantNormalized))
         {
             var rule = await dbContext.MerchantRules
                 .Include(x => x.Category)
-                .FirstOrDefaultAsync(x => x.MerchantNormalized == parsed.MerchantNormalized, ct);
+                .FirstOrDefaultAsync(x => x.UserId == userId && x.MerchantNormalized == parsed.MerchantNormalized, ct);
 
             if (rule is not null)
             {
@@ -151,20 +150,20 @@ public sealed class SmsProcessingBackgroundService(
             }
         }
 
-        var providerConfiguration = await providerResolver.GetEnabledProviderAsync(ct);
-        var provider = await providerResolver.ResolveAsync(ct);
+        var providerConfiguration = await providerResolver.GetEnabledProviderAsync(userId, ct);
+        var provider = await providerResolver.ResolveAsync(userId, ct);
         if (provider is not null && providerConfiguration is not null)
         {
-            var categories = await dbContext.Categories.AsNoTracking().ToListAsync(ct);
+            var categories = await dbContext.Categories.AsNoTracking().Where(c => c.UserId == userId).ToListAsync(ct);
             var result = await provider.CategorizeAsync(
                 providerConfiguration,
-                new CategorizationRequest(parsed.MerchantRaw, parsed.MerchantNormalized, parsed.Amount, parsed.Direction, parsed.TransactionType, parsed.Notes),
+                new CategorizationRequest(parsed.MerchantRaw, parsed.MerchantNormalized, parsed.Amount, parsed.Direction, parsed.TransactionType, parsed.Notes) { UserId = userId },
                 categories,
                 ct);
 
             if (result is not null)
             {
-                var category = await ResolveCategoryResultAsync(dbContext, result, ct);
+                var category = await ResolveCategoryResultAsync(dbContext, result, userId, ct);
                 if (category is not null)
                 {
                     return new CategoryResolution(category, CategorySource.Llm, !string.Equals(category.Name, "Uncategorized", StringComparison.OrdinalIgnoreCase));
@@ -172,13 +171,13 @@ public sealed class SmsProcessingBackgroundService(
             }
         }
 
-        var fallback = await dbContext.Categories.FirstAsync(x => x.Name == "Uncategorized" && x.ParentCategoryId == null, ct);
+        var fallback = await dbContext.Categories.FirstAsync(x => x.UserId == userId && x.Name == "Uncategorized" && x.ParentCategoryId == null, ct);
         return new CategoryResolution(fallback, CategorySource.Default, false);
     }
 
-    private static async Task<Category?> ResolveCategoryResultAsync(AppDbContext dbContext, CategorizationResult result, CancellationToken ct)
+    private static async Task<Category?> ResolveCategoryResultAsync(AppDbContext dbContext, CategorizationResult result, Guid userId, CancellationToken ct)
     {
-        var parent = await dbContext.Categories.FirstOrDefaultAsync(x => x.Name == result.Category && x.ParentCategoryId == null, ct);
+        var parent = await dbContext.Categories.FirstOrDefaultAsync(x => x.UserId == userId && x.Name == result.Category && x.ParentCategoryId == null, ct);
         if (parent is null)
         {
             return null;
@@ -189,7 +188,7 @@ public sealed class SmsProcessingBackgroundService(
             return parent;
         }
 
-        var child = await dbContext.Categories.FirstOrDefaultAsync(x => x.ParentCategoryId == parent.Id && x.Name == result.Subcategory, ct);
+        var child = await dbContext.Categories.FirstOrDefaultAsync(x => x.UserId == userId && x.ParentCategoryId == parent.Id && x.Name == result.Subcategory, ct);
         if (child is not null)
         {
             return child;
@@ -197,6 +196,7 @@ public sealed class SmsProcessingBackgroundService(
 
         child = new Category
         {
+            UserId = userId,
             Name = result.Subcategory,
             ParentCategoryId = parent.Id,
             SortOrder = parent.SortOrder,
@@ -209,13 +209,14 @@ public sealed class SmsProcessingBackgroundService(
         return child;
     }
 
-    private static async Task UpsertMerchantRuleAsync(AppDbContext dbContext, string merchantNormalized, Guid categoryId, string createdBy, CancellationToken ct)
+    private static async Task UpsertMerchantRuleAsync(AppDbContext dbContext, string merchantNormalized, Guid categoryId, string createdBy, Guid userId, CancellationToken ct)
     {
-        var rule = await dbContext.MerchantRules.FirstOrDefaultAsync(x => x.MerchantNormalized == merchantNormalized, ct);
+        var rule = await dbContext.MerchantRules.FirstOrDefaultAsync(x => x.UserId == userId && x.MerchantNormalized == merchantNormalized, ct);
         if (rule is null)
         {
             dbContext.MerchantRules.Add(new MerchantRule
             {
+                UserId = userId,
                 MerchantNormalized = merchantNormalized,
                 CategoryId = categoryId,
                 CreatedBy = createdBy,

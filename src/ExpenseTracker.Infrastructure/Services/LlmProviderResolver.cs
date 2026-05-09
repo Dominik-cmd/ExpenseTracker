@@ -8,7 +8,7 @@ namespace ExpenseTracker.Infrastructure;
 
 public sealed class LlmProviderResolver : ILlmProviderResolver
 {
-    public const string ActiveProviderCacheKey = "llm-provider:active";
+    public const string ActiveProviderCachePrefix = "llm-provider:active:";
 
     private readonly AppDbContext _dbContext;
     private readonly IMemoryCache _memoryCache;
@@ -21,12 +21,12 @@ public sealed class LlmProviderResolver : ILlmProviderResolver
         _providers = providers.ToDictionary(provider => provider.ProviderType);
     }
 
-    public Task<ILlmCategorizationProvider?> ResolveAsync(CancellationToken cancellationToken = default)
-        => GetActiveProviderAsync(cancellationToken);
+    public Task<ILlmCategorizationProvider?> ResolveAsync(Guid userId, CancellationToken cancellationToken = default)
+        => GetActiveProviderAsync(userId, cancellationToken);
 
-    public async Task<ILlmCategorizationProvider?> GetActiveProviderAsync(CancellationToken cancellationToken = default)
+    public async Task<ILlmCategorizationProvider?> GetActiveProviderAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        var enabledProvider = await GetEnabledProviderAsync(cancellationToken);
+        var enabledProvider = await GetEnabledProviderAsync(userId, cancellationToken);
         if (enabledProvider is null)
         {
             return null;
@@ -35,23 +35,29 @@ public sealed class LlmProviderResolver : ILlmProviderResolver
         return _providers.GetValueOrDefault(enabledProvider.ProviderType);
     }
 
-    public async Task<LlmProvider?> GetEnabledProviderAsync(CancellationToken cancellationToken = default)
+    public async Task<LlmProvider?> GetEnabledProviderAsync(Guid userId, CancellationToken cancellationToken = default)
     {
-        if (_memoryCache.TryGetValue(ActiveProviderCacheKey, out LlmProvider? provider))
+        var cacheKey = $"{ActiveProviderCachePrefix}{userId}";
+        if (_memoryCache.TryGetValue(cacheKey, out LlmProvider? provider))
         {
             return provider;
         }
 
         provider = await _dbContext.LlmProviders
             .AsNoTracking()
-            .SingleOrDefaultAsync(item => item.IsEnabled, cancellationToken);
+            .SingleOrDefaultAsync(item => item.UserId == userId && item.IsEnabled, cancellationToken);
 
-        _memoryCache.Set(ActiveProviderCacheKey, provider, TimeSpan.FromSeconds(60));
+        _memoryCache.Set(cacheKey, provider, TimeSpan.FromSeconds(60));
         return provider;
     }
 
     public void InvalidateCache()
     {
-        _memoryCache.Remove(ActiveProviderCacheKey);
+        // Clear all cached providers - simple approach since IMemoryCache doesn't support prefix removal
+        // The cache entries will naturally expire after 60 seconds anyway
+        if (_memoryCache is MemoryCache mc)
+        {
+            mc.Compact(1.0);
+        }
     }
 }

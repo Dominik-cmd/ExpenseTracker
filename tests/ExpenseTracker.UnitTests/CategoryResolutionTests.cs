@@ -12,11 +12,13 @@ namespace ExpenseTracker.UnitTests;
 
 public sealed class CategoryResolutionTests
 {
+    private static readonly Guid TestUserId = Guid.NewGuid();
+
     [Fact]
     public async Task CreateAsync_ShouldAllowSecondLevelCategory()
     {
         using var dbContext = TestDbContextFactory.Create();
-        var parent = new Category { Name = "Groceries", SortOrder = 1 };
+        var parent = new Category { Name = "Groceries", SortOrder = 1, UserId = TestUserId };
         dbContext.Categories.Add(parent);
         await dbContext.SaveChangesAsync();
 
@@ -35,8 +37,8 @@ public sealed class CategoryResolutionTests
     public async Task CreateAsync_ShouldRejectThirdLevelCategory()
     {
         using var dbContext = TestDbContextFactory.Create();
-        var parent = new Category { Name = "Groceries", SortOrder = 1 };
-        var child = new Category { Name = "Mercator", ParentCategoryId = parent.Id, SortOrder = 1 };
+        var parent = new Category { Name = "Groceries", SortOrder = 1, UserId = TestUserId };
+        var child = new Category { Name = "Mercator", ParentCategoryId = parent.Id, SortOrder = 1, UserId = TestUserId };
         dbContext.Categories.AddRange(parent, child);
         await dbContext.SaveChangesAsync();
 
@@ -51,13 +53,13 @@ public sealed class CategoryResolutionTests
     public async Task UpdateAsync_ShouldForbidSystemCategory()
     {
         using var dbContext = TestDbContextFactory.Create();
-        var income = new Category { Name = "Income", IsSystem = true, SortOrder = 19 };
+        var income = new Category { Name = "Income", IsSystem = true, SortOrder = 19, UserId = TestUserId };
         dbContext.Categories.Add(income);
         await dbContext.SaveChangesAsync();
 
         var controller = CreateController(dbContext);
 
-        var result = await controller.UpdateAsync(income.Id, new UpdateCategoryRequest("Salary", null, null, null), CancellationToken.None);
+        var result = await controller.UpdateAsync(income.Id, new UpdateCategoryRequest("Salary", null, null, null, null, null), CancellationToken.None);
 
         result.Result.Should().BeOfType<ForbidResult>();
     }
@@ -66,8 +68,8 @@ public sealed class CategoryResolutionTests
     public async Task DeleteAsync_ShouldForbidSystemCategory()
     {
         using var dbContext = TestDbContextFactory.Create();
-        var income = new Category { Name = "Income", IsSystem = true, SortOrder = 19 };
-        var groceries = new Category { Name = "Groceries", SortOrder = 1 };
+        var income = new Category { Name = "Income", IsSystem = true, SortOrder = 19, UserId = TestUserId };
+        var groceries = new Category { Name = "Groceries", SortOrder = 1, UserId = TestUserId };
         dbContext.Categories.AddRange(income, groceries);
         await dbContext.SaveChangesAsync();
 
@@ -86,7 +88,7 @@ public sealed class CategoryResolutionTests
                 HttpContext = new DefaultHttpContext
                 {
                     User = new ClaimsPrincipal(new ClaimsIdentity(
-                        new[] { new Claim(JwtRegisteredClaimNames.Sub, Guid.NewGuid().ToString()) },
+                        new[] { new Claim(JwtRegisteredClaimNames.Sub, TestUserId.ToString()) },
                         authenticationType: "Test"))
                 }
             }

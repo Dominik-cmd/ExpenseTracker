@@ -4,8 +4,8 @@ namespace ExpenseTracker.Core.Interfaces;
 
 public interface ILlmProviderResolver
 {
-    Task<ILlmCategorizationProvider?> ResolveAsync(CancellationToken cancellationToken = default);
-    Task<ILlmCategorizationProvider?> GetActiveProviderAsync(CancellationToken cancellationToken = default);
-    Task<LlmProvider?> GetEnabledProviderAsync(CancellationToken cancellationToken = default);
+    Task<ILlmCategorizationProvider?> ResolveAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<ILlmCategorizationProvider?> GetActiveProviderAsync(Guid userId, CancellationToken cancellationToken = default);
+    Task<LlmProvider?> GetEnabledProviderAsync(Guid userId, CancellationToken cancellationToken = default);
     void InvalidateCache();
 }

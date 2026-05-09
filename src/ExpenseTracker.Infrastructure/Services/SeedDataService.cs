@@ -35,41 +35,177 @@ public sealed class SeedDataService : IHostedService
         }
 
         await MigrateColumnsAsync(cancellationToken);
-        await SeedUserAsync(initialPassword, cancellationToken);
-        await SeedCategoriesAsync(cancellationToken);
-        await SeedLlmProvidersAsync(cancellationToken);
-        await SeedSettingsAsync(cancellationToken);
+        var user = await SeedUserAsync(initialPassword, cancellationToken);
+        if (user is not null)
+        {
+            await SeedForUserAsync(user, cancellationToken);
+        }
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    /// <summary>Seeds default categories, LLM providers, and settings for a specific user.</summary>
+    public async Task SeedForUserAsync(User user, CancellationToken cancellationToken = default)
+    {
+        await SeedCategoriesAsync(user.Id, cancellationToken);
+        await SeedLlmProvidersAsync(user.Id, cancellationToken);
+        await SeedSettingsAsync(user.Id, cancellationToken);
     }
 
     private async Task MigrateColumnsAsync(CancellationToken cancellationToken)
     {
+        // Skip raw SQL migrations for non-PostgreSQL providers (e.g. InMemory for tests)
+        if (!_dbContext.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) ?? true)
+        {
+            return;
+        }
+
+        // Existing column migrations
         await _dbContext.Database.ExecuteSqlRawAsync(
             "ALTER TABLE categories ADD COLUMN IF NOT EXISTS exclude_from_expenses BOOLEAN NOT NULL DEFAULT FALSE",
             cancellationToken);
         await _dbContext.Database.ExecuteSqlRawAsync(
             "ALTER TABLE categories ADD COLUMN IF NOT EXISTS exclude_from_income BOOLEAN NOT NULL DEFAULT FALSE",
             cancellationToken);
+
+        // Add is_admin column to users and make first user admin
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            DO $$
+            BEGIN
+              IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='is_admin') THEN
+                ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT FALSE;
+                UPDATE users SET is_admin = TRUE WHERE id = (SELECT id FROM users ORDER BY created_at LIMIT 1);
+              END IF;
+            END $$;
+            """, cancellationToken);
+
+        // Multi-user migration: add user_id to all user-scoped tables, backfill with first user
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            DO $$
+            DECLARE first_user_id UUID;
+            BEGIN
+              SELECT id INTO first_user_id FROM users ORDER BY created_at LIMIT 1;
+
+              -- categories
+              IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='categories' AND column_name='user_id') THEN
+                ALTER TABLE categories ADD COLUMN user_id UUID;
+                IF first_user_id IS NOT NULL THEN
+                  UPDATE categories SET user_id = first_user_id;
+                END IF;
+                ALTER TABLE categories ALTER COLUMN user_id SET NOT NULL;
+                ALTER TABLE categories ADD CONSTRAINT fk_categories_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+              END IF;
+
+              -- merchant_rules
+              IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='merchant_rules' AND column_name='user_id') THEN
+                ALTER TABLE merchant_rules ADD COLUMN user_id UUID;
+                IF first_user_id IS NOT NULL THEN
+                  UPDATE merchant_rules SET user_id = first_user_id;
+                END IF;
+                ALTER TABLE merchant_rules ALTER COLUMN user_id SET NOT NULL;
+                ALTER TABLE merchant_rules ADD CONSTRAINT fk_merchant_rules_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+              END IF;
+
+              -- raw_messages
+              IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='raw_messages' AND column_name='user_id') THEN
+                ALTER TABLE raw_messages ADD COLUMN user_id UUID;
+                IF first_user_id IS NOT NULL THEN
+                  UPDATE raw_messages SET user_id = first_user_id;
+                END IF;
+                ALTER TABLE raw_messages ALTER COLUMN user_id SET NOT NULL;
+                ALTER TABLE raw_messages ADD CONSTRAINT fk_raw_messages_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+              END IF;
+
+              -- llm_call_logs
+              IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='llm_call_logs' AND column_name='user_id') THEN
+                ALTER TABLE llm_call_logs ADD COLUMN user_id UUID;
+                IF first_user_id IS NOT NULL THEN
+                  UPDATE llm_call_logs SET user_id = first_user_id;
+                END IF;
+                ALTER TABLE llm_call_logs ALTER COLUMN user_id SET NOT NULL;
+              END IF;
+
+              -- llm_providers
+              IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='llm_providers' AND column_name='user_id') THEN
+                ALTER TABLE llm_providers ADD COLUMN user_id UUID;
+                IF first_user_id IS NOT NULL THEN
+                  UPDATE llm_providers SET user_id = first_user_id;
+                END IF;
+                ALTER TABLE llm_providers ALTER COLUMN user_id SET NOT NULL;
+                ALTER TABLE llm_providers ADD CONSTRAINT fk_llm_providers_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+              END IF;
+
+              -- settings: needs PK change from (key) to (key, user_id)
+              IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='settings' AND column_name='user_id') THEN
+                ALTER TABLE settings ADD COLUMN user_id UUID;
+                IF first_user_id IS NOT NULL THEN
+                  UPDATE settings SET user_id = first_user_id;
+                END IF;
+                ALTER TABLE settings ALTER COLUMN user_id SET NOT NULL;
+                ALTER TABLE settings DROP CONSTRAINT IF EXISTS settings_pkey;
+                ALTER TABLE settings ADD PRIMARY KEY (key, user_id);
+                ALTER TABLE settings ADD CONSTRAINT fk_settings_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+              END IF;
+            END $$;
+            """, cancellationToken);
+
+        // Update unique indexes to include user_id
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            DO $$
+            BEGIN
+              -- merchant_rules: change unique(merchant_normalized) -> unique(user_id, merchant_normalized)
+              IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='ix_merchant_rules_merchant_normalized') THEN
+                DROP INDEX ix_merchant_rules_merchant_normalized;
+              END IF;
+              IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='ix_merchant_rules_user_id_merchant_normalized') THEN
+                CREATE UNIQUE INDEX ix_merchant_rules_user_id_merchant_normalized ON merchant_rules (user_id, merchant_normalized);
+              END IF;
+
+              -- categories: change unique(name, parent_category_id) -> unique(user_id, name, parent_category_id)
+              IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='ix_categories_name_parent_category_id') THEN
+                DROP INDEX ix_categories_name_parent_category_id;
+              END IF;
+              IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='ix_categories_user_id_name_parent_category_id') THEN
+                CREATE UNIQUE INDEX ix_categories_user_id_name_parent_category_id ON categories (user_id, name, parent_category_id) WHERE parent_category_id IS NOT NULL;
+              END IF;
+              IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='ix_categories_user_id_name') THEN
+                CREATE UNIQUE INDEX ix_categories_user_id_name ON categories (user_id, name) WHERE parent_category_id IS NULL;
+              END IF;
+
+              -- llm_providers: change unique(is_enabled) -> unique(user_id, is_enabled)
+              IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='ix_llm_providers_is_enabled') THEN
+                DROP INDEX ix_llm_providers_is_enabled;
+              END IF;
+              IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='ix_llm_providers_user_id_is_enabled') THEN
+                CREATE UNIQUE INDEX ix_llm_providers_user_id_is_enabled ON llm_providers (user_id) WHERE is_enabled = true;
+              END IF;
+            END $$;
+            """, cancellationToken);
     }
 
-    private async Task SeedUserAsync(string initialPassword, CancellationToken cancellationToken)
+    private async Task<User?> SeedUserAsync(string initialPassword, CancellationToken cancellationToken)
     {
         var existingUser = await _dbContext.Users.SingleOrDefaultAsync(user => user.Username == "dominik", cancellationToken);
         if (existingUser is not null)
         {
-            return;
+            return existingUser;
         }
 
-        _dbContext.Users.Add(new User
+        var user = new User
         {
             Username = "dominik",
+            IsAdmin = true,
             PasswordHash = BCrypt.Net.BCrypt.HashPassword(initialPassword, workFactor: 12)
-        });
+        };
+        _dbContext.Users.Add(user);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return user;
     }
 
-    private async Task SeedCategoriesAsync(CancellationToken cancellationToken)
+    private async Task SeedCategoriesAsync(Guid userId, CancellationToken cancellationToken)
     {
-        var existingCategories = await _dbContext.Categories.ToDictionaryAsync(category => (category.Name, category.ParentCategoryId), cancellationToken);
+        var existingCategories = await _dbContext.Categories
+            .Where(c => c.UserId == userId)
+            .ToDictionaryAsync(category => (category.Name, category.ParentCategoryId), cancellationToken);
 
         var topLevelDefinitions = new (string Name, int SortOrder, bool IsSystem)[]
         {
@@ -104,6 +240,7 @@ public sealed class SeedDataService : IHostedService
 
             var category = new Category
             {
+                UserId = userId,
                 Name = definition.Name,
                 SortOrder = definition.SortOrder,
                 IsSystem = definition.IsSystem
@@ -135,6 +272,7 @@ public sealed class SeedDataService : IHostedService
 
             var category = new Category
             {
+                UserId = userId,
                 Name = definition.Name,
                 ParentCategoryId = parentCategory.Id,
                 SortOrder = definition.SortOrder
@@ -145,9 +283,13 @@ public sealed class SeedDataService : IHostedService
         }
     }
 
-    private async Task SeedLlmProvidersAsync(CancellationToken cancellationToken)
+    private async Task SeedLlmProvidersAsync(Guid userId, CancellationToken cancellationToken)
     {
-        var existingTypes = await _dbContext.LlmProviders.Select(provider => provider.ProviderType).ToHashSetAsync(cancellationToken);
+        var existingTypes = await _dbContext.LlmProviders
+            .Where(p => p.UserId == userId)
+            .Select(provider => provider.ProviderType)
+            .ToHashSetAsync(cancellationToken);
+
         var providers = new (LlmProviderType Type, string Name, string Model)[]
         {
             (LlmProviderType.OpenAi, "OpenAI", "GPT-4o"),
@@ -164,6 +306,7 @@ public sealed class SeedDataService : IHostedService
 
             _dbContext.LlmProviders.Add(new LlmProvider
             {
+                UserId = userId,
                 ProviderType = provider.Type,
                 Name = provider.Name,
                 Model = provider.Model,
@@ -173,15 +316,18 @@ public sealed class SeedDataService : IHostedService
         }
     }
 
-    private async Task SeedSettingsAsync(CancellationToken cancellationToken)
+    private async Task SeedSettingsAsync(Guid userId, CancellationToken cancellationToken)
     {
-        var existingKeys = await _dbContext.Settings.Select(setting => setting.Key).ToHashSetAsync(cancellationToken);
+        var existingKeys = await _dbContext.Settings
+            .Where(s => s.UserId == userId)
+            .Select(setting => setting.Key)
+            .ToHashSetAsync(cancellationToken);
 
         if (!existingKeys.Contains("sms_webhook_secret"))
         {
             var secret = GenerateUrlSafeSecret();
-            _dbContext.Settings.Add(new Setting { Key = "sms_webhook_secret", Value = secret });
-            _logger.LogInformation("Seeded sms_webhook_secret: {SmsWebhookSecret}", secret);
+            _dbContext.Settings.Add(new Setting { Key = "sms_webhook_secret", UserId = userId, Value = secret });
+            _logger.LogInformation("Seeded sms_webhook_secret for user {UserId}: {SmsWebhookSecret}", userId, secret);
         }
 
         if (!existingKeys.Contains("sms_senders"))
@@ -189,6 +335,7 @@ public sealed class SeedDataService : IHostedService
             _dbContext.Settings.Add(new Setting
             {
                 Key = "sms_senders",
+                UserId = userId,
                 Value = JsonSerializer.Serialize(new[] { "OTP banka", "OTP", "OTP Banka" })
             });
         }

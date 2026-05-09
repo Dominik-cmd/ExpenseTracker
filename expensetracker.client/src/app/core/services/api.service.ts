@@ -351,6 +351,19 @@ export interface AccountSettings {
   webhookNotifications: boolean;
 }
 
+export interface UserInfo {
+  id: string;
+  username: string;
+  isAdmin: boolean;
+  createdAt: string;
+}
+
+export interface CreateUserRequest {
+  username: string;
+  password: string;
+  isAdmin: boolean;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private readonly http = inject(HttpClient);
@@ -570,6 +583,19 @@ export class ApiService {
         return of(normalized);
       })
     );
+  }
+
+  // Admin endpoints
+  getUsers(): Observable<UserInfo[]> {
+    return this.http.get<UserInfo[]>(buildApiUrl('/api/admin/users'));
+  }
+
+  createUser(request: CreateUserRequest): Observable<UserInfo> {
+    return this.http.post<UserInfo>(buildApiUrl('/api/admin/users'), request);
+  }
+
+  deleteUser(id: string): Observable<void> {
+    return this.http.delete<void>(buildApiUrl(`/api/admin/users/${id}`));
   }
 
   private createParams(values: object): HttpParams {

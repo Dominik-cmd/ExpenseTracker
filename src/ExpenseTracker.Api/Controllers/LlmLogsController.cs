@@ -17,10 +17,13 @@ public sealed class LlmLogsController(AppDbContext dbContext) : ApiControllerBas
         [FromQuery] bool? successOnly = null,
         CancellationToken ct = default)
     {
+        var userId = GetCurrentUserId();
+        if (userId is null) return Unauthorized();
+
         pageSize = Math.Clamp(pageSize, 1, 100);
         page = Math.Max(1, page);
 
-        var query = dbContext.LlmCallLogs.AsNoTracking();
+        var query = dbContext.LlmCallLogs.AsNoTracking().Where(x => x.UserId == userId.Value);
 
         if (!string.IsNullOrWhiteSpace(provider))
             query = query.Where(x => x.ProviderType == provider);
@@ -62,7 +65,10 @@ public sealed class LlmLogsController(AppDbContext dbContext) : ApiControllerBas
     [HttpDelete]
     public async Task<IActionResult> DeleteAllAsync(CancellationToken ct)
     {
-        await dbContext.LlmCallLogs.ExecuteDeleteAsync(ct);
+        var userId = GetCurrentUserId();
+        if (userId is null) return Unauthorized();
+
+        await dbContext.LlmCallLogs.Where(x => x.UserId == userId.Value).ExecuteDeleteAsync(ct);
         return NoContent();
     }
 }

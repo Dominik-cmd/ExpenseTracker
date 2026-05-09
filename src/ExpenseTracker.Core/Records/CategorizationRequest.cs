@@ -26,6 +26,7 @@ public sealed record CategorizationRequest
         Categories = Array.Empty<CategoryHierarchy>();
     }
 
+    public Guid UserId { get; init; }
     public string MerchantRaw { get; }
     public string MerchantNormalized { get; }
     public decimal Amount { get; }

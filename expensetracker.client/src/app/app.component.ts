@@ -13,7 +13,14 @@ import { AuthService } from './core/services/auth.service';
 const DARK_MODE_KEY = 'expense-tracker.dark-mode';
 const SIDEBAR_KEY = 'expense-tracker.sidebar-collapsed';
 
-const NAV_ITEMS = [
+interface NavItem {
+  label: string;
+  route: string;
+  icon: string;
+  adminOnly?: boolean;
+}
+
+const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', route: '/dashboard', icon: 'pi pi-home' },
   { label: 'Transactions', route: '/transactions', icon: 'pi pi-wallet' },
   { label: 'Categories', route: '/categories', icon: 'pi pi-folder-open' },
@@ -25,8 +32,9 @@ const NAV_ITEMS = [
   { label: 'LLM logs', route: '/settings/llm-logs', icon: 'pi pi-list' },
   { label: 'LLM settings', route: '/settings/llm', icon: 'pi pi-bolt' },
   { label: 'Account settings', route: '/settings/account', icon: 'pi pi-user' },
-  { label: 'Webhook settings', route: '/settings/webhook', icon: 'pi pi-send' }
-] as const;
+  { label: 'Webhook settings', route: '/settings/webhook', icon: 'pi pi-send' },
+  { label: 'User management', route: '/admin/users', icon: 'pi pi-users', adminOnly: true }
+];
 
 @Component({
   selector: 'app-root',
@@ -52,7 +60,10 @@ export class AppComponent {
   private readonly document = inject(DOCUMENT);
   private readonly router = inject(Router);
 
-  protected readonly navItems = NAV_ITEMS;
+  protected readonly navItems = computed(() => {
+    const isAdmin = this.authService.isAdmin();
+    return NAV_ITEMS.filter(item => !item.adminOnly || isAdmin);
+  });
   protected readonly darkMode = signal(this.readDarkModePreference());
   protected readonly sidebarCollapsed = signal(this.readSidebarPreference());
   protected readonly isAuthenticated = this.authService.authenticated;

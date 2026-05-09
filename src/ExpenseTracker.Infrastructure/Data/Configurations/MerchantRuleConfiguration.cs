@@ -10,7 +10,12 @@ public sealed class MerchantRuleConfiguration : IEntityTypeConfiguration<Merchan
     {
         builder.ToTable("merchant_rules");
 
-        builder.HasIndex(rule => rule.MerchantNormalized)
+        builder.HasOne(rule => rule.User)
+            .WithMany(user => user.MerchantRules)
+            .HasForeignKey(rule => rule.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        builder.HasIndex(rule => new { rule.UserId, rule.MerchantNormalized })
             .IsUnique();
 
         builder.HasOne(rule => rule.Category)

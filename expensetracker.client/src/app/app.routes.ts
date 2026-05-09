@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 
 import { authGuard } from './core/guards/auth.guard';
+import { adminGuard } from './core/guards/admin.guard';
 
 export const routes: Routes = [
   { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
@@ -68,6 +69,11 @@ export const routes: Routes = [
     path: 'settings/webhook',
     canActivate: [authGuard],
     loadComponent: () => import('./pages/settings/webhook/webhook-settings.component').then((m) => m.WebhookSettingsComponent)
+  },
+  {
+    path: 'admin/users',
+    canActivate: [adminGuard],
+    loadComponent: () => import('./pages/admin/user-management.component').then((m) => m.UserManagementComponent)
   },
   { path: '**', redirectTo: 'dashboard' }
 ];

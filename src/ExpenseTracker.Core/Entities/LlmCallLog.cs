@@ -3,6 +3,7 @@ namespace ExpenseTracker.Core.Entities;
 public sealed class LlmCallLog
 {
     public Guid Id { get; set; }
+    public Guid UserId { get; set; }
     public string ProviderType { get; set; } = string.Empty;
     public string Model { get; set; } = string.Empty;
     public string SystemPrompt { get; set; } = string.Empty;

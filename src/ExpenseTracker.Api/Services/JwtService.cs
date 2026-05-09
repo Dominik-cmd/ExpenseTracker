@@ -14,13 +14,20 @@ public sealed class JwtService(IConfiguration configuration)
     public (string Token, DateTime ExpiresAt) GenerateToken(User user)
     {
         var expiresAt = DateTime.UtcNow.AddHours(1);
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
+            new(JwtRegisteredClaimNames.Name, user.Username)
+        };
+
+        if (user.IsAdmin)
+        {
+            claims.Add(new Claim(ClaimTypes.Role, "Admin"));
+        }
+
         var tokenDescriptor = new SecurityTokenDescriptor
         {
-            Subject = new ClaimsIdentity(
-            [
-                new Claim(JwtRegisteredClaimNames.Sub, user.Id.ToString()),
-                new Claim(JwtRegisteredClaimNames.Name, user.Username)
-            ]),
+            Subject = new ClaimsIdentity(claims),
             Expires = expiresAt,
             Issuer = configuration["Jwt:Issuer"],
             Audience = configuration["Jwt:Audience"],

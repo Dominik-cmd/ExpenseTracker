@@ -5,6 +5,8 @@ namespace ExpenseTracker.Core.Entities;
 public class RawMessage
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+    public Guid UserId { get; set; }
+    public User User { get; set; } = null!;
     public string Sender { get; set; } = string.Empty;
     public string Body { get; set; } = string.Empty;
     public DateTime ReceivedAt { get; set; }

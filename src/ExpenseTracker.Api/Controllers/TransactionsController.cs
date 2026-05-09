@@ -317,11 +317,15 @@ public sealed class TransactionsController(AppDbContext dbContext, ILogger<Trans
 
     private async Task UpsertMerchantRuleAsync(string merchantNormalized, Guid categoryId, string createdBy, CancellationToken ct)
     {
-        var rule = await dbContext.MerchantRules.FirstOrDefaultAsync(x => x.MerchantNormalized == merchantNormalized, ct);
+        var userId = GetCurrentUserId();
+        if (userId is null) return;
+
+        var rule = await dbContext.MerchantRules.FirstOrDefaultAsync(x => x.UserId == userId.Value && x.MerchantNormalized == merchantNormalized, ct);
         if (rule is null)
         {
             dbContext.MerchantRules.Add(new MerchantRule
             {
+                UserId = userId.Value,
                 MerchantNormalized = merchantNormalized,
                 CategoryId = categoryId,
                 CreatedBy = createdBy,

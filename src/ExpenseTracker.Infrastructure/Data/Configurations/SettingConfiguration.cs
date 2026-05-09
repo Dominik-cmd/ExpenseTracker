@@ -9,6 +9,11 @@ public sealed class SettingConfiguration : IEntityTypeConfiguration<Setting>
     public void Configure(EntityTypeBuilder<Setting> builder)
     {
         builder.ToTable("settings");
-        builder.HasKey(setting => setting.Key);
+        builder.HasKey(setting => new { setting.Key, setting.UserId });
+
+        builder.HasOne(setting => setting.User)
+            .WithMany(user => user.Settings)
+            .HasForeignKey(setting => setting.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
     }
 }

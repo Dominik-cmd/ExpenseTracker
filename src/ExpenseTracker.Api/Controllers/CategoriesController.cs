@@ -20,9 +20,12 @@ public sealed class CategoriesController(AppDbContext dbContext, ILogger<Categor
     {
         try
         {
+            var userId = GetCurrentUserId();
+            if (userId is null) return Unauthorized();
+
             var categories = await dbContext.Categories
                 .AsNoTracking()
-                .Where(x => x.ParentCategoryId == null)
+                .Where(x => x.UserId == userId.Value && x.ParentCategoryId == null)
                 .Include(x => x.SubCategories)
                 .OrderBy(x => x.SortOrder)
                 .ThenBy(x => x.Name)
@@ -42,10 +45,13 @@ public sealed class CategoriesController(AppDbContext dbContext, ILogger<Categor
     {
         try
         {
+            var userId = GetCurrentUserId();
+            if (userId is null) return Unauthorized();
+
             Guid? parentCategoryId = null;
             if (request.ParentCategoryId.HasValue)
             {
-                var parent = await dbContext.Categories.FirstOrDefaultAsync(x => x.Id == request.ParentCategoryId.Value, ct);
+                var parent = await dbContext.Categories.FirstOrDefaultAsync(x => x.Id == request.ParentCategoryId.Value && x.UserId == userId.Value, ct);
                 if (parent is null) return BadRequest(new { message = "Parent category does not exist." });
                 if (parent.ParentCategoryId.HasValue) return BadRequest(new { message = "Only two category levels are supported." });
                 parentCategoryId = parent.Id;
@@ -53,11 +59,12 @@ public sealed class CategoriesController(AppDbContext dbContext, ILogger<Categor
 
             var category = new Category
             {
+                UserId = userId.Value,
                 Name = request.Name.Trim(),
                 Color = request.Color,
                 Icon = request.Icon,
                 ParentCategoryId = parentCategoryId,
-                SortOrder = await GetNextSortOrderAsync(parentCategoryId, ct),
+                SortOrder = await GetNextSortOrderAsync(userId.Value, parentCategoryId, ct),
                 IsSystem = false,
                 CreatedAt = DateTime.UtcNow,
                 UpdatedAt = DateTime.UtcNow
@@ -81,7 +88,10 @@ public sealed class CategoriesController(AppDbContext dbContext, ILogger<Categor
     {
         try
         {
-            var category = await dbContext.Categories.Include(x => x.SubCategories).FirstOrDefaultAsync(x => x.Id == id, ct);
+            var userId = GetCurrentUserId();
+            if (userId is null) return Unauthorized();
+
+            var category = await dbContext.Categories.Include(x => x.SubCategories).FirstOrDefaultAsync(x => x.Id == id && x.UserId == userId.Value, ct);
             if (category is null) return NotFound();
             if (category.IsSystem) return Forbid();
 
@@ -111,7 +121,10 @@ public sealed class CategoriesController(AppDbContext dbContext, ILogger<Categor
     {
         try
         {
-            var category = await dbContext.Categories.Include(x => x.SubCategories).FirstOrDefaultAsync(x => x.Id == id, ct);
+            var userId = GetCurrentUserId();
+            if (userId is null) return Unauthorized();
+
+            var category = await dbContext.Categories.Include(x => x.SubCategories).FirstOrDefaultAsync(x => x.Id == id && x.UserId == userId.Value, ct);
             if (category is null) return NotFound();
             if (category.IsSystem) return Forbid();
             if (request.ReassignToCategoryId == id) return BadRequest(new { message = "Cannot reassign to the same category." });
@@ -145,8 +158,8 @@ public sealed class CategoriesController(AppDbContext dbContext, ILogger<Categor
         }
     }
 
-    private async Task<int> GetNextSortOrderAsync(Guid? parentCategoryId, CancellationToken ct)
-        => (await dbContext.Categories.Where(x => x.ParentCategoryId == parentCategoryId).Select(x => (int?)x.SortOrder).MaxAsync(ct) ?? 0) + 1;
+    private async Task<int> GetNextSortOrderAsync(Guid userId, Guid? parentCategoryId, CancellationToken ct)
+        => (await dbContext.Categories.Where(x => x.UserId == userId && x.ParentCategoryId == parentCategoryId).Select(x => (int?)x.SortOrder).MaxAsync(ct) ?? 0) + 1;
 
     private void AddAuditLog(Guid categoryId, string action, object changes)
     {

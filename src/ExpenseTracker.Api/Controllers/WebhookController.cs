@@ -20,16 +20,24 @@ public sealed class WebhookController(AppDbContext dbContext, Channel<Guid> chan
     {
         try
         {
-            var secret = await dbContext.Settings.AsNoTracking().Where(x => x.Key == "sms_webhook_secret").Select(x => x.Value).FirstOrDefaultAsync(ct);
-            if (string.IsNullOrWhiteSpace(secret))
-            {
-                return Problem(statusCode: StatusCodes.Status500InternalServerError, title: "Webhook secret is not configured.");
-            }
-
-            if (!Request.Headers.TryGetValue("X-Webhook-Secret", out var provided) || !SecretsMatch(secret, provided.ToString()))
+            if (!Request.Headers.TryGetValue("X-Webhook-Secret", out var provided) || string.IsNullOrWhiteSpace(provided))
             {
                 return Unauthorized();
             }
+
+            // Find the user whose webhook secret matches
+            var settings = await dbContext.Settings
+                .AsNoTracking()
+                .Where(x => x.Key == "sms_webhook_secret")
+                .ToListAsync(ct);
+
+            var matchedSetting = settings.FirstOrDefault(s => SecretsMatch(s.Value ?? "", provided.ToString()));
+            if (matchedSetting is null)
+            {
+                return Unauthorized();
+            }
+
+            var userId = matchedSetting.UserId;
 
             var idempotencyHash = Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes($"{request.From}|{request.Text}|{request.SentStamp}")));
             if (await dbContext.RawMessages.AnyAsync(x => x.IdempotencyHash == idempotencyHash, ct))
@@ -40,6 +48,7 @@ public sealed class WebhookController(AppDbContext dbContext, Channel<Guid> chan
             var sentAt = DateTime.TryParse(request.SentStamp, out var parsedSentAt) ? parsedSentAt.ToUniversalTime() : DateTime.UtcNow;
             var rawMessage = new RawMessage
             {
+                UserId = userId,
                 Sender = request.From,
                 Body = request.Text,
                 SentAt = sentAt,

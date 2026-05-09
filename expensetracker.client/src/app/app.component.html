@@ -15,7 +15,7 @@
 
     <nav class="nav-links">
       <a
-        *ngFor="let item of navItems"
+        *ngFor="let item of navItems()"
         [routerLink]="item.route"
         routerLinkActive="active"
         [routerLinkActiveOptions]="{ exact: true }"

@@ -31,7 +31,10 @@ public sealed class LlmProvidersController(
     {
         try
         {
-            var items = await dbContext.LlmProviders.AsNoTracking().OrderBy(x => x.ProviderType).ToListAsync(ct);
+            var userId = GetCurrentUserId();
+            if (userId is null) return Unauthorized();
+
+            var items = await dbContext.LlmProviders.AsNoTracking().Where(x => x.UserId == userId.Value).OrderBy(x => x.ProviderType).ToListAsync(ct);
             return Ok(items.Select(x => x.ToDto()).ToList());
         }
         catch (Exception ex)
@@ -46,7 +49,10 @@ public sealed class LlmProvidersController(
     {
         try
         {
-            var provider = await dbContext.LlmProviders.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id, ct);
+            var userId = GetCurrentUserId();
+            if (userId is null) return Unauthorized();
+
+            var provider = await dbContext.LlmProviders.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && x.UserId == userId.Value, ct);
             return provider is null ? NotFound() : Ok(provider.ToDto());
         }
         catch (Exception ex)
@@ -61,7 +67,10 @@ public sealed class LlmProvidersController(
     {
         try
         {
-            var provider = await dbContext.LlmProviders.FirstOrDefaultAsync(x => x.Id == id, ct);
+            var userId = GetCurrentUserId();
+            if (userId is null) return Unauthorized();
+
+            var provider = await dbContext.LlmProviders.FirstOrDefaultAsync(x => x.Id == id && x.UserId == userId.Value, ct);
             if (provider is null) return NotFound();
 
             var changes = new Dictionary<string, object?>();
@@ -95,7 +104,10 @@ public sealed class LlmProvidersController(
     {
         try
         {
-            var providersToUpdate = await dbContext.LlmProviders.ToListAsync(ct);
+            var userId = GetCurrentUserId();
+            if (userId is null) return Unauthorized();
+
+            var providersToUpdate = await dbContext.LlmProviders.Where(x => x.UserId == userId.Value).ToListAsync(ct);
             if (providersToUpdate.All(x => x.Id != id)) return NotFound();
 
             foreach (var provider in providersToUpdate)
@@ -121,7 +133,10 @@ public sealed class LlmProvidersController(
     {
         try
         {
-            var providersToUpdate = await dbContext.LlmProviders.ToListAsync(ct);
+            var userId = GetCurrentUserId();
+            if (userId is null) return Unauthorized();
+
+            var providersToUpdate = await dbContext.LlmProviders.Where(x => x.UserId == userId.Value).ToListAsync(ct);
             foreach (var provider in providersToUpdate)
             {
                 provider.IsEnabled = false;
@@ -144,7 +159,10 @@ public sealed class LlmProvidersController(
     {
         try
         {
-            var providerRow = await dbContext.LlmProviders.FirstOrDefaultAsync(x => x.Id == id, ct);
+            var userId = GetCurrentUserId();
+            if (userId is null) return Unauthorized();
+
+            var providerRow = await dbContext.LlmProviders.FirstOrDefaultAsync(x => x.Id == id && x.UserId == userId.Value, ct);
             if (providerRow is null) return NotFound();
             if (string.IsNullOrWhiteSpace(providerRow.ApiKeyEncrypted))
             {
@@ -157,11 +175,11 @@ public sealed class LlmProvidersController(
             var provider = providers.FirstOrDefault(x => x.ProviderType == providerRow.ProviderType);
             if (provider is null) return NotFound();
 
-            var categories = await dbContext.Categories.AsNoTracking().ToListAsync(ct);
+            var categories = await dbContext.Categories.AsNoTracking().Where(c => c.UserId == userId.Value).ToListAsync(ct);
             var startedAt = DateTime.UtcNow;
             var result = await provider.CategorizeAsync(
                 providerRow,
-                new CategorizationRequest("NETFLIX", "NETFLIX", 12.99m, Direction.Debit, TransactionType.Purchase, "TEST REQUEST"),
+                new CategorizationRequest("NETFLIX", "NETFLIX", 12.99m, Direction.Debit, TransactionType.Purchase, "TEST REQUEST") { UserId = userId.Value },
                 categories,
                 ct);
             var latencyMs = (DateTime.UtcNow - startedAt).TotalMilliseconds;
@@ -191,7 +209,10 @@ public sealed class LlmProvidersController(
     {
         try
         {
-            var provider = await dbContext.LlmProviders.AsNoTracking().FirstOrDefaultAsync(x => x.IsEnabled, ct);
+            var userId = GetCurrentUserId();
+            if (userId is null) return Unauthorized();
+
+            var provider = await dbContext.LlmProviders.AsNoTracking().FirstOrDefaultAsync(x => x.UserId == userId.Value && x.IsEnabled, ct);
             return Ok(provider?.ToDto());
         }
         catch (Exception ex)

@@ -20,9 +20,13 @@ public sealed class RawMessagesController(AppDbContext dbContext, Channel<Guid> 
     {
         try
         {
+            var userId = GetCurrentUserId();
+            if (userId is null) return Unauthorized();
+
             var query = dbContext.RawMessages
                 .AsNoTracking()
                 .Include(x => x.Transactions)
+                .Where(x => x.UserId == userId.Value)
                 .OrderByDescending(x => x.CreatedAt)
                 .AsQueryable();
 
@@ -46,7 +50,10 @@ public sealed class RawMessagesController(AppDbContext dbContext, Channel<Guid> 
     {
         try
         {
-            var rawMessage = await dbContext.RawMessages.Include(x => x.Transactions).FirstOrDefaultAsync(x => x.Id == id, ct);
+            var userId = GetCurrentUserId();
+            if (userId is null) return Unauthorized();
+
+            var rawMessage = await dbContext.RawMessages.Include(x => x.Transactions).FirstOrDefaultAsync(x => x.Id == id && x.UserId == userId.Value, ct);
             if (rawMessage is null) return NotFound();
 
             if (rawMessage.Transactions.Count != 0)
@@ -73,7 +80,10 @@ public sealed class RawMessagesController(AppDbContext dbContext, Channel<Guid> 
     {
         try
         {
-            var rawMessage = await dbContext.RawMessages.FirstOrDefaultAsync(x => x.Id == id, ct);
+            var userId = GetCurrentUserId();
+            if (userId is null) return Unauthorized();
+
+            var rawMessage = await dbContext.RawMessages.FirstOrDefaultAsync(x => x.Id == id && x.UserId == userId.Value, ct);
             if (rawMessage is null) return NotFound();
             dbContext.RawMessages.Remove(rawMessage);
             await dbContext.SaveChangesAsync(ct);

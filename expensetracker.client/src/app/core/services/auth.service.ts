@@ -115,6 +115,12 @@ export class AuthService {
     return typeof username === 'string' ? username : null;
   }
 
+  isAdmin(): boolean {
+    const payload = this.decodeToken(this.getToken());
+    const role = payload?.['role'] ?? payload?.['http://schemas.microsoft.com/ws/2008/06/identity/claims/role'];
+    return role === 'Admin' || (Array.isArray(role) && role.includes('Admin'));
+  }
+
   clearSession(redirect = true): void {
     this.sessionState.set(null);
     localStorage.removeItem(AUTH_STORAGE_KEY);

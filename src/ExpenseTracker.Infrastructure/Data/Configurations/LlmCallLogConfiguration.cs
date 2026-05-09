@@ -22,5 +22,6 @@ internal sealed class LlmCallLogConfiguration : IEntityTypeConfiguration<LlmCall
         builder.Property(x => x.ParsedSubcategory).HasMaxLength(200);
         builder.HasIndex(x => x.CreatedAt);
         builder.HasIndex(x => x.ProviderType);
+        builder.HasIndex(x => x.UserId);
     }
 }
