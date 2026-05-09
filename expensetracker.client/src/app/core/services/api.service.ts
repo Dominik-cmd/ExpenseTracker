@@ -178,6 +178,7 @@ export interface LlmProvider {
 export interface UpdateLlmProviderRequest {
   model?: string | null;
   apiKey?: string | null;
+  isEnabled?: boolean;
 }
 
 export interface LlmTestResult {
@@ -364,6 +365,26 @@ export interface CreateUserRequest {
   isAdmin: boolean;
 }
 
+export interface QueuedItem {
+  id: string;
+  preview: string;
+  createdAt: string;
+}
+
+export interface RecentItem {
+  id: string;
+  preview: string;
+  status: string;
+  failureReason: string | null;
+  processedAt: string;
+}
+
+export interface QueueStatus {
+  pendingCount: number;
+  pending: QueuedItem[];
+  recentlyProcessed: RecentItem[];
+}
+
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private readonly http = inject(HttpClient);
@@ -481,6 +502,10 @@ export class ApiService {
 
   recategorizeUncategorized(): Observable<{ queuedCount: number }> {
     return this.http.post<{ queuedCount: number }>(buildApiUrl('/api/llm-providers/recategorize-uncategorized'), {});
+  }
+
+  getQueueStatus(): Observable<QueueStatus> {
+    return this.http.get<QueueStatus>(buildApiUrl('/api/raw-messages/queue-status'));
   }
 
   getDashboardAnalytics(): Observable<DashboardAnalytics> {

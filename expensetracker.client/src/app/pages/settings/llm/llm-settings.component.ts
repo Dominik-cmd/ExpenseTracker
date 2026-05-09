@@ -57,7 +57,7 @@ const LLM_SETTINGS_FALLBACK: LlmSettings = {
               <p-tag [value]="provider.hasApiKey ? 'API key configured' : 'Missing API key'" [severity]="provider.hasApiKey ? 'success' : 'warn'"></p-tag>
               <p-tag *ngIf="provider.lastTestStatus" [value]="provider.lastTestStatus"></p-tag>
             </div>
-            <p-toggleSwitch [ngModel]="provider.isEnabled" (ngModelChange)="toggleProvider(provider, $event)"></p-toggleSwitch>
+            <p-toggleSwitch [ngModel]="drafts[providerKey(provider)]?.isEnabled ?? provider.isEnabled" (ngModelChange)="toggleProvider(provider, $event)"></p-toggleSwitch>
           </div>
 
           <div class="p-fluid flex flex-column gap-3">
@@ -108,7 +108,7 @@ export class LlmSettingsComponent {
 
   protected readonly settings = signal<LlmSettings>(LLM_SETTINGS_FALLBACK);
   protected readonly busyKey = signal<string | null>(null);
-  protected drafts: Record<string, { model: string; apiKey: string }> = this.createDrafts(LLM_SETTINGS_FALLBACK.providers);
+  protected drafts: Record<string, { model: string; apiKey: string; isEnabled: boolean }> = this.createDrafts(LLM_SETTINGS_FALLBACK.providers);
 
   constructor() {
     this.loadSettings();
@@ -126,7 +126,7 @@ export class LlmSettingsComponent {
 
   protected updateDraft(provider: LlmProvider, key: 'model' | 'apiKey', value: string): void {
     const providerKey = this.providerKey(provider);
-    const current = this.drafts[providerKey] ?? { model: provider.model, apiKey: '' };
+    const current = this.drafts[providerKey] ?? { model: provider.model, apiKey: '', isEnabled: provider.isEnabled };
     this.drafts = {
       ...this.drafts,
       [providerKey]: {
@@ -137,42 +137,45 @@ export class LlmSettingsComponent {
   }
 
   protected toggleProvider(provider: LlmProvider, enabled: boolean): void {
-    const key = `toggle-${this.providerKey(provider)}`;
-    this.busyKey.set(key);
-    const request$ = enabled ? this.apiService.enableLlmProvider(provider.id) : this.apiService.disableAllLlmProviders();
-
-    request$.pipe(
-      catchError(() => of(void 0)),
-      finalize(() => this.busyKey.set(null)),
-      takeUntilDestroyed(this.destroyRef)
-    ).subscribe(() => {
-      this.settings.update((settings) => ({
-        ...settings,
-        providers: settings.providers.map((item) => ({ ...item, isEnabled: enabled ? item.id === provider.id : false })),
-        activeProvider: enabled ? provider : null
-      }));
-      this.messageService.add({ severity: 'success', summary: enabled ? 'Provider enabled' : 'Providers disabled', detail: enabled ? `${provider.name} is now active.` : 'No provider is currently active.' });
-    });
+    const key = this.providerKey(provider);
+    // If enabling, disable all others in draft state (only one can be active)
+    if (enabled) {
+      for (const k of Object.keys(this.drafts)) {
+        if (k !== key) {
+          this.drafts = { ...this.drafts, [k]: { ...this.drafts[k], isEnabled: false } };
+        }
+      }
+    }
+    this.drafts = { ...this.drafts, [key]: { ...this.drafts[key], isEnabled: enabled } };
   }
 
   protected saveProvider(provider: LlmProvider): void {
     const key = this.providerKey(provider);
-    const draft = this.drafts[key] ?? { model: provider.model, apiKey: '' };
+    const draft = this.drafts[key] ?? { model: provider.model, apiKey: '', isEnabled: provider.isEnabled };
     this.busyKey.set(`save-${key}`);
 
     this.apiService.updateLlmProvider(provider.id, {
       model: draft.model || provider.model,
-      apiKey: draft.apiKey || undefined
+      apiKey: draft.apiKey || undefined,
+      isEnabled: draft.isEnabled
     }).pipe(
-      catchError(() => of({ ...provider, model: draft.model || provider.model, hasApiKey: provider.hasApiKey || Boolean(draft.apiKey) })),
+      catchError(() => of({ ...provider, model: draft.model || provider.model, hasApiKey: provider.hasApiKey || Boolean(draft.apiKey), isEnabled: draft.isEnabled })),
       finalize(() => this.busyKey.set(null)),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe((updatedProvider) => {
-      this.settings.update((settings) => ({
-        ...settings,
-        providers: settings.providers.map((item) => this.providerKey(item) === key ? { ...item, ...updatedProvider } : item),
-        activeProvider: settings.activeProvider && this.providerKey(settings.activeProvider) === key ? { ...settings.activeProvider, ...updatedProvider } : settings.activeProvider
-      }));
+      this.settings.update((settings) => {
+        const providers = settings.providers.map((item) => {
+          if (this.providerKey(item) === key) return { ...item, ...updatedProvider };
+          // If we just enabled this provider, disable others in server state too
+          if (draft.isEnabled) return { ...item, isEnabled: false };
+          return item;
+        });
+        return {
+          ...settings,
+          providers,
+          activeProvider: providers.find((p) => p.isEnabled) ?? null
+        };
+      });
       this.updateDraft(updatedProvider, 'apiKey', '');
       this.messageService.add({ severity: 'success', summary: 'Provider saved', detail: `${provider.name} settings updated.` });
     });
@@ -266,7 +269,7 @@ export class LlmSettingsComponent {
     return { providers, activeProvider };
   }
 
-  private createDrafts(providers: LlmProvider[]): Record<string, { model: string; apiKey: string }> {
-    return Object.fromEntries(providers.map((provider) => [this.providerKey(provider), { model: provider.model, apiKey: '' }]));
+  private createDrafts(providers: LlmProvider[]): Record<string, { model: string; apiKey: string; isEnabled: boolean }> {
+    return Object.fromEntries(providers.map((provider) => [this.providerKey(provider), { model: provider.model, apiKey: '', isEnabled: provider.isEnabled }]));
   }
 }

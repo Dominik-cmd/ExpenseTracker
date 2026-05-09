@@ -88,6 +88,21 @@ public sealed class LlmProvidersController(
                 changes["ApiKeyUpdated"] = true;
             }
 
+            if (request.IsEnabled.HasValue)
+            {
+                if (request.IsEnabled.Value)
+                {
+                    // Disable all others first (separate save to avoid unique index conflict), then enable this one
+                    await dbContext.LlmProviders
+                        .Where(x => x.UserId == userId.Value && x.Id != id)
+                        .ExecuteUpdateAsync(s => s
+                            .SetProperty(x => x.IsEnabled, false)
+                            .SetProperty(x => x.UpdatedAt, DateTime.UtcNow), ct);
+                }
+                provider.IsEnabled = request.IsEnabled.Value;
+                changes[nameof(provider.IsEnabled)] = request.IsEnabled.Value;
+            }
+
             provider.UpdatedAt = DateTime.UtcNow;
             AddAuditLog(provider.Id, "Patch", changes);
             await dbContext.SaveChangesAsync(ct);

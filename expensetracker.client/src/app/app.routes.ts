@@ -75,5 +75,10 @@ export const routes: Routes = [
     canActivate: [adminGuard],
     loadComponent: () => import('./pages/admin/user-management.component').then((m) => m.UserManagementComponent)
   },
+  {
+    path: 'queue',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/queue/queue.component').then((m) => m.QueueComponent)
+  },
   { path: '**', redirectTo: 'dashboard' }
 ];

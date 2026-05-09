@@ -14,7 +14,7 @@ public sealed record LlmProviderDto(
     DateTime? LastTestedAt,
     string? LastTestStatus);
 
-public sealed record UpdateLlmProviderRequest(string? Model, string? ApiKey);
+public sealed record UpdateLlmProviderRequest(string? Model, string? ApiKey, bool? IsEnabled);
 
 public sealed record LlmTestResponse(bool Success, double LatencyMs, string? ErrorMessage);
 

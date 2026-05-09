@@ -26,6 +26,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'Categories', route: '/categories', icon: 'pi pi-folder-open' },
   { label: 'Merchant rules', route: '/merchant-rules', icon: 'pi pi-sitemap' },
   { label: 'Parse failures', route: '/parse-failures', icon: 'pi pi-exclamation-triangle' },
+  { label: 'Processing queue', route: '/queue', icon: 'pi pi-server' },
   { label: 'Monthly report', route: '/reports/monthly', icon: 'pi pi-chart-line' },
   { label: 'Yearly report', route: '/reports/yearly', icon: 'pi pi-chart-bar' },
   { label: 'Insights', route: '/reports/insights', icon: 'pi pi-sparkles' },

@@ -15,6 +15,38 @@ namespace ExpenseTracker.Api.Controllers
 [Route("api/raw-messages")]
 public sealed class RawMessagesController(AppDbContext dbContext, Channel<Guid> channel, ILogger<RawMessagesController> logger) : ApiControllerBase
 {
+    [HttpGet("queue-status")]
+    public async Task<ActionResult<QueueStatusDto>> GetQueueStatusAsync(CancellationToken ct)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (userId is null) return Unauthorized();
+
+            var pending = await dbContext.RawMessages
+                .AsNoTracking()
+                .Where(x => x.UserId == userId.Value && x.ParseStatus == ParseStatus.Pending)
+                .OrderBy(x => x.CreatedAt)
+                .Select(x => new QueuedItemDto(x.Id, x.Body.Length > 80 ? x.Body.Substring(0, 80) + "…" : x.Body, x.CreatedAt))
+                .ToListAsync(ct);
+
+            var recentlyProcessed = await dbContext.RawMessages
+                .AsNoTracking()
+                .Where(x => x.UserId == userId.Value && x.ParseStatus != ParseStatus.Pending)
+                .OrderByDescending(x => x.UpdatedAt)
+                .Take(20)
+                .Select(x => new RecentItemDto(x.Id, x.Body.Length > 80 ? x.Body.Substring(0, 80) + "…" : x.Body, x.ParseStatus.ToString(), x.FailureReason, x.UpdatedAt))
+                .ToListAsync(ct);
+
+            return Ok(new QueueStatusDto(pending.Count, pending, recentlyProcessed));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to fetch queue status.");
+            return Problem(statusCode: StatusCodes.Status500InternalServerError, title: "Unable to fetch queue status.");
+        }
+    }
+
     [HttpGet]
     public async Task<ActionResult<List<RawMessageDto>>> GetAsync([FromQuery] ParseStatus? status, CancellationToken ct)
     {
