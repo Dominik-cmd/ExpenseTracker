@@ -479,6 +479,10 @@ export class ApiService {
     return this.http.post<LlmTestResult>(buildApiUrl(`/api/llm-providers/${id}/test`), {});
   }
 
+  recategorizeUncategorized(): Observable<{ queuedCount: number }> {
+    return this.http.post<{ queuedCount: number }>(buildApiUrl('/api/llm-providers/recategorize-uncategorized'), {});
+  }
+
   getDashboardAnalytics(): Observable<DashboardAnalytics> {
     return this.http.get<DashboardAnalytics>(buildApiUrl('/api/analytics/dashboard'));
   }

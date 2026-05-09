@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Threading.Channels;
 using ExpenseTracker.Api.Models;
 using ExpenseTracker.Api.Services;
 using ExpenseTracker.Core.Entities;
@@ -22,6 +23,7 @@ public sealed class LlmProvidersController(
     IDataProtectionProvider dataProtectionProvider,
     ILlmProviderResolver providerResolver,
     IEnumerable<ILlmCategorizationProvider> providers,
+    Channel<Guid> channel,
     ILogger<LlmProvidersController> logger) : ApiControllerBase
 {
     private readonly IDataProtector _protector = dataProtectionProvider.CreateProtector("LlmApiKeys");
@@ -233,6 +235,58 @@ public sealed class LlmProvidersController(
             UserId = GetCurrentUserId(),
             CreatedAt = DateTime.UtcNow
         });
+    }
+
+    [HttpPost("recategorize-uncategorized")]
+    public async Task<ActionResult<RecategorizeUncategorizedResponse>> RecategorizeUncategorizedAsync(CancellationToken ct)
+    {
+        try
+        {
+            var userId = GetCurrentUserId();
+            if (userId is null) return Unauthorized();
+
+            // Find raw messages that have transactions with CategorySource.Default (fallback/uncategorized)
+            var rawMessageIds = await dbContext.Transactions
+                .Where(t => t.UserId == userId.Value
+                    && t.CategorySource == CategorySource.Default
+                    && t.RawMessageId != null)
+                .Select(t => t.RawMessageId!.Value)
+                .Distinct()
+                .ToListAsync(ct);
+
+            if (rawMessageIds.Count == 0)
+                return Ok(new RecategorizeUncategorizedResponse(0));
+
+            // For each raw message, delete its transactions and reset to Pending (same as single reprocess)
+            var rawMessages = await dbContext.RawMessages
+                .Include(r => r.Transactions)
+                .Where(r => rawMessageIds.Contains(r.Id) && r.UserId == userId.Value)
+                .ToListAsync(ct);
+
+            foreach (var rawMessage in rawMessages)
+            {
+                dbContext.Transactions.RemoveRange(rawMessage.Transactions);
+                rawMessage.ParseStatus = ParseStatus.Pending;
+                rawMessage.FailureReason = null;
+                rawMessage.UpdatedAt = DateTime.UtcNow;
+            }
+
+            await dbContext.SaveChangesAsync(ct);
+
+            // Enqueue all into the existing channel — background service processes them one by one
+            foreach (var rawMessage in rawMessages)
+            {
+                await channel.Writer.WriteAsync(rawMessage.Id, ct);
+            }
+
+            logger.LogInformation("Queued {Count} uncategorized transactions for re-categorization (user {UserId}).", rawMessages.Count, userId.Value);
+            return Ok(new RecategorizeUncategorizedResponse(rawMessages.Count));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to queue uncategorized transactions for re-categorization.");
+            return Problem(statusCode: StatusCodes.Status500InternalServerError, title: "Unable to queue transactions.");
+        }
     }
 }
 }

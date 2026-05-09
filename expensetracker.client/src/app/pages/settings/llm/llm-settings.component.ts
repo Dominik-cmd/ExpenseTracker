@@ -33,7 +33,15 @@ const LLM_SETTINGS_FALLBACK: LlmSettings = {
   selector: 'app-llm-settings',
   imports: [CommonModule, FormsModule, ButtonModule, CardModule, InputTextModule, PasswordModule, TagModule, ToggleSwitchModule],
   template: `
-    <div class="flex justify-content-end mb-3">
+    <div class="flex justify-content-end mb-3 gap-2">
+      <p-button
+        label="Re-run LLM on uncategorized"
+        icon="pi pi-sync"
+        severity="secondary"
+        [outlined]="true"
+        [loading]="busyKey() === 're-categorize'"
+        (onClick)="recategorizeUncategorized()">
+      </p-button>
       <p-button label="Disable all providers" icon="pi pi-stop" severity="secondary" [outlined]="true" [loading]="busyKey() === 'disable-all'" (onClick)="disableAll()"></p-button>
     </div>
 
@@ -191,6 +199,24 @@ export class LlmSettingsComponent {
         summary: result.success ? 'Connection OK' : 'Connection failed',
         detail: result.success ? `${provider.name} replied in ${Math.round(result.latencyMs)} ms.` : (result.errorMessage ?? 'Provider did not return a result.')
       });
+    });
+  }
+
+  protected recategorizeUncategorized(): void {
+    this.busyKey.set('re-categorize');
+    this.apiService.recategorizeUncategorized().pipe(
+      catchError(() => of({ queuedCount: -1 })),
+      finalize(() => this.busyKey.set(null)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe((result) => {
+      if (result.queuedCount === -1) {
+        this.messageService.add({ severity: 'error', summary: 'Failed', detail: 'Unable to queue transactions for re-categorization.' });
+        return;
+      }
+      const detail = result.queuedCount === 0
+        ? 'No uncategorized transactions found.'
+        : `${result.queuedCount} transaction(s) queued — the LLM will process them in the background.`;
+      this.messageService.add({ severity: result.queuedCount === 0 ? 'info' : 'success', summary: 'Queued', detail });
     });
   }
 
