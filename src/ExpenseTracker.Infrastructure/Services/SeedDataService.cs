@@ -82,6 +82,7 @@ public sealed class SeedDataService : IHostedService
         await _dbContext.Database.ExecuteSqlRawAsync("""
             DO $$
             DECLARE first_user_id UUID;
+            DECLARE settings_pk_name TEXT;
             BEGIN
               SELECT id INTO first_user_id FROM users ORDER BY created_at LIMIT 1;
 
@@ -141,7 +142,12 @@ public sealed class SeedDataService : IHostedService
                   UPDATE settings SET user_id = first_user_id;
                 END IF;
                 ALTER TABLE settings ALTER COLUMN user_id SET NOT NULL;
-                ALTER TABLE settings DROP CONSTRAINT IF EXISTS settings_pkey;
+                SELECT conname INTO settings_pk_name
+                  FROM pg_constraint
+                  WHERE conrelid = 'settings'::regclass AND contype = 'p';
+                IF settings_pk_name IS NOT NULL THEN
+                  EXECUTE 'ALTER TABLE settings DROP CONSTRAINT ' || quote_ident(settings_pk_name);
+                END IF;
                 ALTER TABLE settings ADD PRIMARY KEY (key, user_id);
                 ALTER TABLE settings ADD CONSTRAINT fk_settings_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
               END IF;
