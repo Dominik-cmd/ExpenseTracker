@@ -6,7 +6,7 @@ namespace ExpenseTracker.Api.Controllers
 {
 
 
-[Route("diagnostic")]
+[Route("api/diagnostic")]
 public sealed class DiagnosticController(OtpBankaSmsParser parser, ILogger<DiagnosticController> logger) : ApiControllerBase
 {
     [HttpPost("parse-sms")]

@@ -1,6 +1,6 @@
 const PROXY_CONFIG = [
   {
-    context: ["/api", "/diagnostic"],
+    context: ["/api"],
     target: "http://api:8080",
     secure: false,
     changeOrigin: true

@@ -426,7 +426,7 @@ export class ApiService {
   }
 
   parseRawMessageManually(text: string): Observable<ManualParseResult> {
-    return this.http.post<ManualParseResult>(buildApiUrl('/diagnostic/parse-sms'), { text });
+    return this.http.post<ManualParseResult>(buildApiUrl('/api/diagnostic/parse-sms'), { text });
   }
 
   deleteRawMessage(id: string): Observable<void> {

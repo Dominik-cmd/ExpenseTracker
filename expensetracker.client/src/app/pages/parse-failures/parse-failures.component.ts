@@ -46,8 +46,8 @@ const PARSE_FAILURES_FALLBACK: RawMessage[] = [
             <td>{{ message.receivedAt | date:'short' }}</td>
             <td>{{ message.sender }}</td>
             <td class="truncate-column">{{ message.body }}</td>
-            <td><p-tag [value]="message.parseStatus" [severity]="message.parseStatus === 'Pending' ? 'warn' : 'danger'"></p-tag></td>
-            <td>{{ message.errorMessage || 'Needs manual review' }}</td>
+            <td><p-tag [value]="message.parseStatus" [severity]="message.parseStatus === 'Pending' ? 'warn' : message.parseStatus === 'Parsed' ? 'success' : 'danger'"></p-tag></td>
+            <td>{{ message.errorMessage || '-' }}</td>
             <td>
               <div class="flex flex-wrap gap-2">
                 <p-button label="Preview" icon="pi pi-eye" size="small" [text]="true" (onClick)="openPreview(message)"></p-button>
@@ -64,7 +64,7 @@ const PARSE_FAILURES_FALLBACK: RawMessage[] = [
       <div *ngIf="selectedMessage() as message" class="flex flex-column gap-3 mt-1">
         <div class="flex flex-wrap gap-2 align-items-center">
           <p-tag [value]="message.sender"></p-tag>
-          <p-tag [value]="message.parseStatus" [severity]="message.parseStatus === 'Pending' ? 'warn' : 'danger'"></p-tag>
+          <p-tag [value]="message.parseStatus" [severity]="message.parseStatus === 'Pending' ? 'warn' : message.parseStatus === 'Parsed' ? 'success' : 'danger'"></p-tag>
         </div>
         <pre class="preview-body">{{ message.body }}</pre>
         <div class="flex justify-content-end">
@@ -197,6 +197,6 @@ export class ParseFailuresComponent {
     this.apiService.getRawMessages().pipe(
       catchError(() => of(PARSE_FAILURES_FALLBACK)),
       takeUntilDestroyed(this.destroyRef)
-    ).subscribe((messages) => this.messages.set(messages.filter((message) => `${message.parseStatus}`.toLowerCase() !== 'success')));
+    ).subscribe((messages) => this.messages.set(messages.filter((message) => `${message.parseStatus}`.toLowerCase() !== 'parsed')));
   }
 }
