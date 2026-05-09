@@ -523,10 +523,10 @@ export class ApiService {
 
   updateSmsSenders(senders: string[]): Observable<string[]> {
     const normalized = this.normalizeSenders(senders);
-    return this.http.patch<void>(buildApiUrl('/api/settings/sms-senders'), { senders: normalized }, {
+    return this.http.patch<string[]>(buildApiUrl('/api/settings/sms-senders'), { senders: normalized }, {
       context: this.silentContext()
     }).pipe(
-      map(() => normalized),
+      map((saved) => saved ?? normalized),
       tap((savedSenders) => this.writeStorageValue(SMS_SENDERS_STORAGE_KEY, JSON.stringify(savedSenders))),
       catchError(() => of(normalized))
     );

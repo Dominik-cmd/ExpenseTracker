@@ -70,7 +70,7 @@ public sealed class SettingsController(AppDbContext dbContext, ILogger<SettingsC
     }
 
     [HttpPatch("sms-senders")]
-    public async Task<IActionResult> UpdateSmsSendersAsync([FromBody] UpdateSmsSendersRequest request, CancellationToken ct)
+    public async Task<ActionResult<List<string>>> UpdateSmsSendersAsync([FromBody] UpdateSmsSendersRequest request, CancellationToken ct)
     {
         try
         {
@@ -80,10 +80,16 @@ public sealed class SettingsController(AppDbContext dbContext, ILogger<SettingsC
                 return NotFound();
             }
 
-            setting.Value = JsonSerializer.Serialize(request.Senders.Distinct(StringComparer.OrdinalIgnoreCase).ToList());
+            var cleaned = request.Senders
+                .Select(s => s.Trim())
+                .Where(s => !string.IsNullOrEmpty(s))
+                .Distinct()
+                .ToList();
+
+            setting.Value = JsonSerializer.Serialize(cleaned);
             setting.UpdatedAt = DateTime.UtcNow;
             await dbContext.SaveChangesAsync(ct);
-            return NoContent();
+            return Ok(cleaned);
         }
         catch (Exception ex)
         {

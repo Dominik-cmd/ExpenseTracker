@@ -39,10 +39,19 @@ const WEBHOOK_SETTINGS_FALLBACK: WebhookSettings = {
       <div class="col-12 xl:col-7">
         <p-card header="Allowed SMS senders" subheader="Trusted sender aliases used by the SMS webhook and parser.">
           <div class="p-fluid flex flex-column gap-3">
-            <p-chips [(ngModel)]="senders" [separator]="','" [allowDuplicate]="false" placeholder="Add trusted SMS senders"></p-chips>
-            <div class="flex flex-wrap gap-2">
-              <p-tag *ngFor="let sender of senders" [value]="sender"></p-tag>
+            <div class="flex gap-2">
+              <input type="text" pInputText [(ngModel)]="newSender" placeholder="Enter sender name" (keydown.enter)="addSender()" class="flex-1" />
+              <p-button icon="pi pi-plus" label="Add" [disabled]="!newSender.trim()" (onClick)="addSender()"></p-button>
             </div>
+            <div class="flex flex-wrap gap-2" *ngIf="senders.length > 0">
+              <p-tag *ngFor="let sender of senders; let i = index" [value]="sender" [rounded]="true">
+                <span class="flex align-items-center gap-1">
+                  {{ sender }}
+                  <i class="pi pi-times" style="cursor: pointer; font-size: 0.75rem; margin-left: 0.25rem;" (click)="removeSender(i)"></i>
+                </span>
+              </p-tag>
+            </div>
+            <small *ngIf="senders.length === 0" class="text-color-secondary">No senders configured. Add at least one trusted sender.</small>
             <div class="flex flex-wrap gap-2 justify-content-end">
               <p-button label="Reset" severity="secondary" [outlined]="true" (onClick)="resetSenders()"></p-button>
               <p-button label="Save senders" icon="pi pi-save" [loading]="savingSenders()" (onClick)="saveSenders()"></p-button>
@@ -72,9 +81,22 @@ export class WebhookSettingsComponent {
   protected readonly rotatingSecret = signal(false);
   protected readonly savingSenders = signal(false);
   protected senders: string[] = [...WEBHOOK_SETTINGS_FALLBACK.senders];
+  protected newSender = '';
 
   constructor() {
     this.loadSettings();
+  }
+
+  protected addSender(): void {
+    const trimmed = this.newSender.trim();
+    if (trimmed && !this.senders.includes(trimmed)) {
+      this.senders = [...this.senders, trimmed];
+    }
+    this.newSender = '';
+  }
+
+  protected removeSender(index: number): void {
+    this.senders = this.senders.filter((_, i) => i !== index);
   }
 
   protected rotateSecret(): void {
