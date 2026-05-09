@@ -9,6 +9,7 @@ import { CardModule } from 'primeng/card';
 import { DialogModule } from 'primeng/dialog';
 import { InputTextModule } from 'primeng/inputtext';
 import { TagModule } from 'primeng/tag';
+import { TooltipModule } from 'primeng/tooltip';
 
 import { ApiService, Category, CreateCategoryRequest, UpdateCategoryRequest } from '../../core/services/api.service';
 
@@ -21,20 +22,20 @@ interface CategoryFormModel {
 
 const CATEGORIES_FALLBACK: Category[] = [
   {
-    id: 'groceries', name: 'Groceries', color: '#10b981', icon: 'pi pi-shopping-basket', sortOrder: 1, isSystem: true, parentCategoryId: null,
+    id: 'groceries', name: 'Groceries', color: '#10b981', icon: 'pi pi-shopping-basket', sortOrder: 1, isSystem: true, excludeFromExpenses: false, parentCategoryId: null,
     subCategories: [
-      { id: 'mercator', name: 'Mercator', color: '#10b981', icon: 'pi pi-shop', sortOrder: 1, isSystem: false, parentCategoryId: 'groceries', subCategories: [] },
-      { id: 'hofer', name: 'Hofer', color: '#34d399', icon: 'pi pi-shop', sortOrder: 2, isSystem: false, parentCategoryId: 'groceries', subCategories: [] }
+      { id: 'mercator', name: 'Mercator', color: '#10b981', icon: 'pi pi-shop', sortOrder: 1, isSystem: false, excludeFromExpenses: false, parentCategoryId: 'groceries', subCategories: [] },
+      { id: 'hofer', name: 'Hofer', color: '#34d399', icon: 'pi pi-shop', sortOrder: 2, isSystem: false, excludeFromExpenses: false, parentCategoryId: 'groceries', subCategories: [] }
     ]
   },
   {
-    id: 'fuel', name: 'Fuel', color: '#3b82f6', icon: 'pi pi-car', sortOrder: 2, isSystem: true, parentCategoryId: null,
+    id: 'fuel', name: 'Fuel', color: '#3b82f6', icon: 'pi pi-car', sortOrder: 2, isSystem: true, excludeFromExpenses: false, parentCategoryId: null,
     subCategories: [
-      { id: 'omv', name: 'OMV', color: '#60a5fa', icon: 'pi pi-car', sortOrder: 1, isSystem: false, parentCategoryId: 'fuel', subCategories: [] }
+      { id: 'omv', name: 'OMV', color: '#60a5fa', icon: 'pi pi-car', sortOrder: 1, isSystem: false, excludeFromExpenses: false, parentCategoryId: 'fuel', subCategories: [] }
     ]
   },
   {
-    id: 'subscriptions', name: 'Subscriptions', color: '#8b5cf6', icon: 'pi pi-bolt', sortOrder: 3, isSystem: false, parentCategoryId: null,
+    id: 'subscriptions', name: 'Subscriptions', color: '#8b5cf6', icon: 'pi pi-bolt', sortOrder: 3, isSystem: false, excludeFromExpenses: false, parentCategoryId: null,
     subCategories: []
   }
 ];
@@ -42,7 +43,7 @@ const CATEGORIES_FALLBACK: Category[] = [
 @Component({
   standalone: true,
   selector: 'app-categories',
-  imports: [CommonModule, FormsModule, ButtonModule, CardModule, DialogModule, InputTextModule, TagModule],
+  imports: [CommonModule, FormsModule, ButtonModule, CardModule, DialogModule, InputTextModule, TagModule, TooltipModule],
   template: `
     <div class="flex justify-content-end mb-3">
       <p-button label="Add category" icon="pi pi-plus" (onClick)="openCreateDialog()"></p-button>
@@ -62,7 +63,10 @@ const CATEGORIES_FALLBACK: Category[] = [
                   <small class="text-color-secondary">{{ category.subCategories.length }} subcategories</small>
                 </div>
               </div>
-              <p-tag [value]="category.isSystem ? 'System' : 'Custom'" [severity]="category.isSystem ? 'secondary' : 'success'"></p-tag>
+              <div class="flex gap-2 align-items-center">
+                <p-tag [value]="category.isSystem ? 'System' : 'Custom'" [severity]="category.isSystem ? 'secondary' : 'success'"></p-tag>
+                <p-tag *ngIf="category.excludeFromExpenses" value="Excluded" severity="warn" icon="pi pi-eye-slash"></p-tag>
+              </div>
             </div>
           </ng-template>
 
@@ -70,6 +74,7 @@ const CATEGORIES_FALLBACK: Category[] = [
             <p-button icon="pi pi-plus" size="small" [text]="true" (onClick)="openCreateDialog(category.id)"></p-button>
             <p-button icon="pi pi-chevron-down" size="small" [text]="true" [severity]="isExpanded(category.id) ? 'contrast' : 'secondary'" (onClick)="toggleExpanded(category.id)"></p-button>
             <p-button icon="pi pi-pencil" size="small" [text]="true" [disabled]="category.isSystem" (onClick)="openEditDialog(category)"></p-button>
+            <p-button [icon]="category.excludeFromExpenses ? 'pi pi-eye' : 'pi pi-eye-slash'" size="small" [text]="true" [severity]="category.excludeFromExpenses ? 'warn' : 'secondary'" [pTooltip]="category.excludeFromExpenses ? 'Include in expenses' : 'Exclude from expenses'" tooltipPosition="top" (onClick)="toggleExcludeFromExpenses(category)"></p-button>
             <p-button icon="pi pi-trash" size="small" [text]="true" severity="danger" [disabled]="category.isSystem" (onClick)="openDeleteDialog(category)"></p-button>
           </div>
 
@@ -322,6 +327,21 @@ export class CategoriesComponent {
     this.deleteDialogVisible = true;
   }
 
+  protected toggleExcludeFromExpenses(category: Category): void {
+    const newValue = !category.excludeFromExpenses;
+    this.apiService.updateCategory(category.id, { excludeFromExpenses: newValue } as UpdateCategoryRequest).pipe(
+      catchError(() => of({ ...category, excludeFromExpenses: newValue } as Category)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe((updated) => {
+      this.upsertCategory(updated);
+      this.messageService.add({
+        severity: newValue ? 'warn' : 'success',
+        summary: newValue ? 'Excluded from expenses' : 'Included in expenses',
+        detail: `"${category.name}" will ${newValue ? 'no longer' : 'now'} count toward expense totals and reports.`
+      });
+    });
+  }
+
   protected deleteCategory(): void {
     if (!this.deleteTargetCategory || !this.reassignCategoryId) {
       this.messageService.add({ severity: 'warn', summary: 'Choose target', detail: 'Select a reassignment category first.' });
@@ -401,6 +421,7 @@ export class CategoriesComponent {
       icon: payload.icon,
       sortOrder: 99,
       isSystem: false,
+      excludeFromExpenses: false,
       parentCategoryId: payload.parentCategoryId ?? null,
       subCategories: []
     };

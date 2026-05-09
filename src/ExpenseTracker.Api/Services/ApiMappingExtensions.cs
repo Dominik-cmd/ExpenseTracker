@@ -37,6 +37,7 @@ public static class ApiMappingExtensions
             category.Icon,
             category.SortOrder,
             category.IsSystem,
+            category.ExcludeFromExpenses,
             category.ParentCategoryId,
             category.SubCategories.OrderBy(x => x.SortOrder).ThenBy(x => x.Name).Select(ToDto).ToList());
 

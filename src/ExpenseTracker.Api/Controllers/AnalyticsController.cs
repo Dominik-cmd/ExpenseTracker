@@ -24,7 +24,7 @@ public sealed class AnalyticsController(AppDbContext dbContext, ILogger<Analytic
             if (transactions is null) return Unauthorized();
 
             var now = DateTime.UtcNow;
-            var spending = transactions.Where(x => x.Direction == Direction.Debit).ToList();
+            var spending = transactions.Where(x => x.Direction == Direction.Debit && !IsExcludedFromExpenses(x)).ToList();
             var last30Start = now.Date.AddDays(-29);
             var prev30Start = last30Start.AddDays(-30);
             var prev30End = last30Start.AddDays(-1);
@@ -71,14 +71,14 @@ public sealed class AnalyticsController(AppDbContext dbContext, ILogger<Analytic
             var end = start.AddMonths(1).AddTicks(-1);
             var prevStart = start.AddMonths(-1);
             var prevEnd = start.AddTicks(-1);
-            var current = transactions.Where(x => x.Direction == Direction.Debit && x.TransactionDate >= start && x.TransactionDate <= end).ToList();
-            var previous = transactions.Where(x => x.Direction == Direction.Debit && x.TransactionDate >= prevStart && x.TransactionDate <= prevEnd).ToList();
+            var current = transactions.Where(x => x.Direction == Direction.Debit && !IsExcludedFromExpenses(x) && x.TransactionDate >= start && x.TransactionDate <= end).ToList();
+            var previous = transactions.Where(x => x.Direction == Direction.Debit && !IsExcludedFromExpenses(x) && x.TransactionDate >= prevStart && x.TransactionDate <= prevEnd).ToList();
             var total = current.Sum(x => x.Amount);
             var previousTotal = previous.Sum(x => x.Amount);
             var percentChange = previousTotal == 0 ? 0 : Math.Round(((total - previousTotal) / previousTotal) * 100, 2);
             var rollingAverage = Enumerable.Range(0, 3)
                 .Select(offset => transactions
-                    .Where(x => x.Direction == Direction.Debit && x.TransactionDate >= start.AddMonths(-offset) && x.TransactionDate < start.AddMonths(1 - offset))
+                    .Where(x => x.Direction == Direction.Debit && !IsExcludedFromExpenses(x) && x.TransactionDate >= start.AddMonths(-offset) && x.TransactionDate < start.AddMonths(1 - offset))
                     .Sum(x => x.Amount))
                 .Average();
 
@@ -129,8 +129,8 @@ public sealed class AnalyticsController(AppDbContext dbContext, ILogger<Analytic
             var yearEnd = year == DateTime.UtcNow.Year ? DateTime.UtcNow : yearStart.AddYears(1).AddTicks(-1);
             var previousYearStart = yearStart.AddYears(-1);
             var previousYearEnd = yearEnd.AddYears(-1);
-            var current = transactions.Where(x => x.Direction == Direction.Debit && x.TransactionDate >= yearStart && x.TransactionDate <= yearEnd).ToList();
-            var previous = transactions.Where(x => x.Direction == Direction.Debit && x.TransactionDate >= previousYearStart && x.TransactionDate <= previousYearEnd).ToList();
+            var current = transactions.Where(x => x.Direction == Direction.Debit && !IsExcludedFromExpenses(x) && x.TransactionDate >= yearStart && x.TransactionDate <= yearEnd).ToList();
+            var previous = transactions.Where(x => x.Direction == Direction.Debit && !IsExcludedFromExpenses(x) && x.TransactionDate >= previousYearStart && x.TransactionDate <= previousYearEnd).ToList();
             var yearTotal = current.Sum(x => x.Amount);
             var previousYearTotal = previous.Sum(x => x.Amount);
             var percentChange = previousYearTotal == 0 ? 0 : Math.Round(((yearTotal - previousYearTotal) / previousYearTotal) * 100, 2);
@@ -168,7 +168,7 @@ public sealed class AnalyticsController(AppDbContext dbContext, ILogger<Analytic
 
             var now = DateTime.UtcNow;
             var yearStart = new DateTime(now.Year, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-            var spending = transactions.Where(x => x.Direction == Direction.Debit && x.TransactionDate >= yearStart).ToList();
+            var spending = transactions.Where(x => x.Direction == Direction.Debit && !IsExcludedFromExpenses(x) && x.TransactionDate >= yearStart).ToList();
             var calendarHeatmap = spending.GroupBy(x => x.TransactionDate.Date).Select(x => new CalendarHeatmapPoint(x.Key, x.Sum(y => y.Amount))).OrderBy(x => x.Date).ToList();
             var dayOfWeekAverages = spending.GroupBy(x => x.TransactionDate.DayOfWeek).Select(x => new DayOfWeekAverage(x.Key.ToString(), Math.Round(x.Average(y => y.Amount), 2), x.Count())).ToList();
             var recurringTransactions = spending
@@ -272,10 +272,13 @@ public sealed class AnalyticsController(AppDbContext dbContext, ILogger<Analytic
     private static string GetCategoryKey(Transaction transaction)
         => transaction.Category.ParentCategory?.Name ?? transaction.Category.Name;
 
+    private static bool IsExcludedFromExpenses(Transaction transaction)
+        => transaction.Category.ExcludeFromExpenses || transaction.Category.ParentCategory?.ExcludeFromExpenses == true;
+
     private static IncomeWidget BuildIncomeWidget(List<Transaction> allTransactions, DateTime now)
     {
         var income = allTransactions.Where(x => x.Direction == Direction.Credit).ToList();
-        var spending = allTransactions.Where(x => x.Direction == Direction.Debit).ToList();
+        var spending = allTransactions.Where(x => x.Direction == Direction.Debit && !IsExcludedFromExpenses(x)).ToList();
 
         var currentMonthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
         var last30Start = now.Date.AddDays(-29);

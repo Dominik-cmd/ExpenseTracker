@@ -34,11 +34,19 @@ public sealed class SeedDataService : IHostedService
             _logger.LogWarning("INITIAL_PASSWORD was not configured. Using the default bootstrap password.");
         }
 
+        await MigrateColumnsAsync(cancellationToken);
         await SeedUserAsync(initialPassword, cancellationToken);
         await SeedCategoriesAsync(cancellationToken);
         await SeedLlmProvidersAsync(cancellationToken);
         await SeedSettingsAsync(cancellationToken);
         await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task MigrateColumnsAsync(CancellationToken cancellationToken)
+    {
+        await _dbContext.Database.ExecuteSqlRawAsync(
+            "ALTER TABLE categories ADD COLUMN IF NOT EXISTS exclude_from_expenses BOOLEAN NOT NULL DEFAULT FALSE",
+            cancellationToken);
     }
 
     private async Task SeedUserAsync(string initialPassword, CancellationToken cancellationToken)
