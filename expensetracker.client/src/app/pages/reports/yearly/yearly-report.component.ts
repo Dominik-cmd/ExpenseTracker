@@ -14,27 +14,12 @@ import { ApiService, YearlyReport } from '../../../core/services/api.service';
 const currentYear = new Date().getFullYear();
 const YEARLY_FALLBACK: YearlyReport = {
   year: currentYear,
-  yearTotal: 8450.2,
-  previousYearTotal: 8032.7,
-  percentChange: 5.2,
-  monthlyCategories: [
-    { month: 1, categoryName: 'Groceries', amount: 280 },
-    { month: 2, categoryName: 'Groceries', amount: 310 },
-    { month: 1, categoryName: 'Fuel', amount: 120 },
-    { month: 2, categoryName: 'Fuel', amount: 140 }
-  ],
-  largestTransactions: [
-    {
-      id: '1', userId: 'demo', amount: 640, currency: 'EUR', direction: 'Debit', transactionType: 'Transfer', transactionDate: new Date().toISOString(),
-      merchantRaw: 'Landlord', merchantNormalized: 'LANDLORD', categoryId: 'housing', categorySource: 'Manual', transactionSource: 'Manual', notes: 'Rent', isDeleted: false,
-      rawMessageId: null, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(), categoryName: 'Housing', parentCategoryName: null
-    }
-  ],
-  categoryEvolution: [
-    { categoryName: 'Groceries', values: Array.from({ length: 12 }, (_, index) => ({ month: index + 1, amount: 250 + index * 12 })) },
-    { categoryName: 'Fuel', values: Array.from({ length: 12 }, (_, index) => ({ month: index + 1, amount: 90 + index * 6 })) },
-    { categoryName: 'Dining', values: Array.from({ length: 12 }, (_, index) => ({ month: index + 1, amount: 75 + index * 4 })) }
-  ]
+  yearTotal: 0,
+  previousYearTotal: 0,
+  percentChange: 0,
+  monthlyCategories: [],
+  largestTransactions: [],
+  categoryEvolution: []
 };
 
 @Component({

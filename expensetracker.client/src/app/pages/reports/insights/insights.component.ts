@@ -10,30 +10,12 @@ import { EChartsOption } from 'echarts';
 
 import { ApiService, InsightsReport } from '../../../core/services/api.service';
 
-const startOfYear = new Date(new Date().getFullYear(), 0, 1);
 const INSIGHTS_FALLBACK: InsightsReport = {
-  calendarHeatmap: Array.from({ length: 12 }, (_, index) => ({
-    date: new Date(startOfYear.getTime() + index * 86400000 * 7).toISOString(),
-    amount: [12, 48, 35, 92, 24, 61, 40, 77, 18, 55, 73, 29][index]
-  })),
-  dayOfWeekAverages: [
-    { dayOfWeek: 'Monday', averageAmount: 28.4, transactionCount: 18 },
-    { dayOfWeek: 'Tuesday', averageAmount: 32.1, transactionCount: 14 },
-    { dayOfWeek: 'Wednesday', averageAmount: 44.2, transactionCount: 16 },
-    { dayOfWeek: 'Thursday', averageAmount: 39.9, transactionCount: 15 },
-    { dayOfWeek: 'Friday', averageAmount: 57.3, transactionCount: 21 },
-    { dayOfWeek: 'Saturday', averageAmount: 63.1, transactionCount: 11 },
-    { dayOfWeek: 'Sunday', averageAmount: 22.5, transactionCount: 9 }
-  ],
-  recurringTransactions: [
-    { merchant: 'NETFLIX', averageAmount: 12.99, latestAmount: 12.99, latestDate: new Date().toISOString(), isAnomaly: false },
-    { merchant: 'OMV', averageAmount: 48.2, latestAmount: 61.4, latestDate: new Date(Date.now() - 86400000 * 2).toISOString(), isAnomaly: true }
-  ],
-  firstTimeMerchants: [
-    { merchant: 'LOCAL BAKERY', amount: 8.4, transactionDate: new Date().toISOString() },
-    { merchant: 'BOOKSTORE', amount: 23.9, transactionDate: new Date(Date.now() - 86400000 * 4).toISOString() }
-  ],
-  quietDays: [new Date(Date.now() - 86400000 * 1).toISOString(), new Date(Date.now() - 86400000 * 5).toISOString()]
+  calendarHeatmap: [],
+  dayOfWeekAverages: [],
+  recurringTransactions: [],
+  firstTimeMerchants: [],
+  quietDays: []
 };
 
 @Component({

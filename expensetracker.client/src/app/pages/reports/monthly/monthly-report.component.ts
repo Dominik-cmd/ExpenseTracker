@@ -15,25 +15,13 @@ const now = new Date();
 const MONTHLY_FALLBACK: MonthlyReport = {
   year: now.getFullYear(),
   month: now.getMonth() + 1,
-  totalAmount: 923.1,
-  previousMonthTotal: 874.5,
-  percentChange: 5.56,
-  rolling3MonthAverage: 889.42,
-  categoryComparisons: [
-    { name: 'Groceries', currentAmount: 320, previousAmount: 280, deltaAmount: 40, deltaPercent: 14.29 },
-    { name: 'Fuel', currentAmount: 210, previousAmount: 255, deltaAmount: -45, deltaPercent: -17.65 },
-    { name: 'Dining', currentAmount: 150, previousAmount: 110, deltaAmount: 40, deltaPercent: 36.36 }
-  ],
-  dailySpending: Array.from({ length: 7 }, (_, index) => ({
-    date: new Date(Date.now() - (6 - index) * 86400000).toISOString(),
-    amount: [24, 60, 30, 82, 41, 49, 28][index],
-    rolling7Day: [24, 42, 38, 49, 47, 48, 45][index],
-    rolling30Day: [29, 30, 32, 35, 37, 39, 40][index]
-  })),
-  topMerchants: [
-    { name: 'Mercator', totalAmount: 188.92, transactionCount: 6 },
-    { name: 'OMV', totalAmount: 134.2, transactionCount: 3 }
-  ]
+  totalAmount: 0,
+  previousMonthTotal: 0,
+  percentChange: 0,
+  rolling3MonthAverage: 0,
+  categoryComparisons: [],
+  dailySpending: [],
+  topMerchants: []
 };
 
 @Component({

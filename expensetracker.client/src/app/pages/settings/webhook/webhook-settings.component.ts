@@ -6,9 +6,7 @@ import { catchError, finalize, of } from 'rxjs';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
-import { ChipsModule } from 'primeng/chips';
 import { InputTextModule } from 'primeng/inputtext';
-import { TagModule } from 'primeng/tag';
 
 import { ApiService, WebhookSettings } from '../../../core/services/api.service';
 
@@ -20,7 +18,7 @@ const WEBHOOK_SETTINGS_FALLBACK: WebhookSettings = {
 @Component({
   standalone: true,
   selector: 'app-webhook-settings',
-  imports: [CommonModule, FormsModule, ButtonModule, CardModule, ChipsModule, InputTextModule, TagModule],
+  imports: [CommonModule, FormsModule, ButtonModule, CardModule, InputTextModule],
   template: `
     <div class="grid">
       <div class="col-12 xl:col-5">
@@ -38,18 +36,16 @@ const WEBHOOK_SETTINGS_FALLBACK: WebhookSettings = {
 
       <div class="col-12 xl:col-7">
         <p-card header="Allowed SMS senders" subheader="Trusted sender aliases used by the SMS webhook and parser.">
-          <div class="p-fluid flex flex-column gap-3">
-            <div class="flex gap-2">
-              <input type="text" pInputText [(ngModel)]="newSender" placeholder="Enter sender name" (keydown.enter)="addSender()" class="flex-1" />
+          <div class="flex flex-column gap-3">
+            <div class="flex gap-2 align-items-center">
+              <input type="text" pInputText [(ngModel)]="newSender" placeholder="Enter sender name" (keydown.enter)="addSender()" style="flex: 1" />
               <p-button icon="pi pi-plus" label="Add" [disabled]="!newSender.trim()" (onClick)="addSender()"></p-button>
             </div>
             <div class="flex flex-wrap gap-2" *ngIf="senders.length > 0">
-              <p-tag *ngFor="let sender of senders; let i = index" [value]="sender" [rounded]="true">
-                <span class="flex align-items-center gap-1">
-                  {{ sender }}
-                  <i class="pi pi-times" style="cursor: pointer; font-size: 0.75rem; margin-left: 0.25rem;" (click)="removeSender(i)"></i>
-                </span>
-              </p-tag>
+              <span *ngFor="let sender of senders; let i = index" class="sender-chip">
+                {{ sender }}
+                <i class="pi pi-times-circle sender-remove" (click)="removeSender(i)"></i>
+              </span>
             </div>
             <small *ngIf="senders.length === 0" class="text-color-secondary">No senders configured. Add at least one trusted sender.</small>
             <div class="flex flex-wrap gap-2 justify-content-end">
@@ -68,6 +64,31 @@ const WEBHOOK_SETTINGS_FALLBACK: WebhookSettings = {
       border-radius: var(--border-radius);
       background: var(--surface-100);
       word-break: break-all;
+    }
+    .sender-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.35rem 0.75rem;
+      border-radius: 1rem;
+      background: var(--primary-100, #e0e7ff);
+      color: var(--primary-700, #4338ca);
+      font-size: 0.875rem;
+      font-weight: 500;
+    }
+    :host-context(.dark) .sender-chip,
+    :host-context([data-theme="dark"]) .sender-chip {
+      background: var(--primary-900, #312e81);
+      color: var(--primary-200, #c7d2fe);
+    }
+    .sender-remove {
+      cursor: pointer;
+      font-size: 0.8rem;
+      opacity: 0.7;
+      transition: opacity 0.15s;
+    }
+    .sender-remove:hover {
+      opacity: 1;
     }
   `]
 })

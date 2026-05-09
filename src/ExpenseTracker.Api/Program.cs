@@ -104,6 +104,7 @@ using (var scope = app.Services.CreateScope())
 }
 
 app.UseCors();
+app.UseMiddleware<ExpenseTracker.Api.Middleware.RequestTimingMiddleware>();
 app.UseAuthentication();
 app.UseAuthorization();
 app.UseRateLimiter();
