@@ -349,15 +349,8 @@ export class TransactionsComponent {
     label: category.parentCategoryId ? `${this.resolveParentCategoryName(category.parentCategoryId)} › ${category.name}` : category.name,
     value: category.id
   })));
-  protected readonly visibleTransactions = computed(() => {
-    const categoryIds = this.appliedFilters.categoryIds;
-    if (categoryIds.length === 0) {
-      return this.transactions().items;
-    }
-
-    return this.transactions().items.filter((transaction) => categoryIds.includes(transaction.categoryId));
-  });
-  protected readonly effectiveTotalRecords = computed(() => this.appliedFilters.categoryIds.length === 0 ? this.transactions().totalCount : this.visibleTransactions().length);
+  protected readonly visibleTransactions = computed(() => this.transactions().items);
+  protected readonly effectiveTotalRecords = computed(() => this.transactions().totalCount);
 
   protected readonly directionOptions = DIRECTION_OPTIONS;
   protected readonly transactionTypeOptions = TRANSACTION_TYPE_OPTIONS;
@@ -612,8 +605,8 @@ export class TransactionsComponent {
       pageSize
     };
 
-    if (this.appliedFilters.categoryIds.length === 1) {
-      filters.categoryId = this.appliedFilters.categoryIds[0];
+    if (this.appliedFilters.categoryIds.length > 0) {
+      filters.categoryIds = this.appliedFilters.categoryIds;
     }
 
     return filters;

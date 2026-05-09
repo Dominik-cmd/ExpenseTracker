@@ -277,6 +277,7 @@ public sealed class TransactionsController(AppDbContext dbContext, ILogger<Trans
         if (filter.From.HasValue) query = query.Where(x => x.TransactionDate >= filter.From.Value);
         if (filter.To.HasValue) query = query.Where(x => x.TransactionDate <= filter.To.Value);
         if (filter.CategoryId.HasValue) query = query.Where(x => x.CategoryId == filter.CategoryId || x.Category.ParentCategoryId == filter.CategoryId);
+        if (filter.CategoryIds != null && filter.CategoryIds.Count > 0) query = query.Where(x => filter.CategoryIds.Contains(x.CategoryId) || (x.Category.ParentCategoryId.HasValue && filter.CategoryIds.Contains(x.Category.ParentCategoryId.Value)));
         if (!string.IsNullOrWhiteSpace(filter.Merchant))
         {
             var merchant = filter.Merchant.Trim().ToUpperInvariant();

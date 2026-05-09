@@ -50,6 +50,7 @@ public sealed record TransactionFilterParams(
     DateTime? From,
     DateTime? To,
     Guid? CategoryId,
+    List<Guid>? CategoryIds,
     string? Merchant,
     decimal? MinAmount,
     decimal? MaxAmount,
