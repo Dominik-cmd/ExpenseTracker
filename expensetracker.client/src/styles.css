@@ -1,0 +1,114 @@
+@import 'primeicons/primeicons.css';
+@import 'primeflex/primeflex.css';
+
+:root {
+  color-scheme: light;
+  --app-surface-0: #f5f7fb;
+  --app-surface-1: #ffffff;
+  --app-surface-border: rgba(15, 23, 42, 0.08);
+  --app-sidebar-active: rgba(37, 99, 235, 0.12);
+  --app-text-color: #0f172a;
+  --app-text-muted: #64748b;
+  --app-shadow: 0 16px 40px rgba(15, 23, 42, 0.08);
+}
+
+.app-dark {
+  color-scheme: dark;
+  --app-surface-0: #0b1220;
+  --app-surface-1: #111827;
+  --app-surface-border: rgba(148, 163, 184, 0.18);
+  --app-sidebar-active: rgba(96, 165, 250, 0.18);
+  --app-text-color: #e2e8f0;
+  --app-text-muted: #94a3b8;
+  --app-shadow: 0 18px 48px rgba(2, 6, 23, 0.45);
+}
+
+html, body {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--app-surface-0);
+  color: var(--app-text-color);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+.p-card,
+.p-sidebar,
+.p-datatable,
+.p-toast-message {
+  box-shadow: var(--app-shadow);
+}
+
+.p-card {
+  border-radius: 1.25rem;
+}
+
+.p-sidebar {
+  border: 0;
+}
+
+.p-datatable .p-datatable-thead > tr > th {
+  white-space: nowrap;
+}
+
+.text-color-secondary {
+  color: var(--app-text-muted) !important;
+}
+
+.max-w-20rem {
+  max-width: 20rem;
+}
+
+/* Dark mode dropdown fix — ensure text is visible */
+.app-dark .p-select-label,
+.app-dark .p-select .p-select-label,
+.app-dark .p-dropdown .p-dropdown-label,
+.app-dark .p-dropdown-panel,
+.app-dark .p-dropdown-panel .p-dropdown-items .p-dropdown-item,
+.app-dark .p-select-overlay,
+.app-dark .p-select-overlay .p-select-option,
+.app-dark .p-listbox .p-listbox-option,
+.app-dark .p-multiselect-label,
+.app-dark .p-multiselect-panel .p-multiselect-items .p-multiselect-option,
+.app-dark select,
+.app-dark select option,
+.app-dark .native-select,
+.app-dark .native-select option {
+  color: var(--app-text-color) !important;
+  background-color: var(--app-surface-1) !important;
+}
+
+.app-dark .p-select,
+.app-dark .p-dropdown,
+.app-dark .p-multiselect {
+  background: var(--app-surface-1) !important;
+  color: var(--app-text-color) !important;
+  border-color: var(--app-surface-border) !important;
+}
+
+.app-dark .p-select-overlay,
+.app-dark .p-dropdown-panel,
+.app-dark .p-multiselect-panel {
+  background: var(--app-surface-1) !important;
+  border-color: var(--app-surface-border) !important;
+}
+
+.app-dark .p-select-option:hover,
+.app-dark .p-dropdown-item:hover,
+.app-dark .p-multiselect-option:hover,
+.app-dark .p-listbox-option:hover {
+  background: var(--app-sidebar-active) !important;
+}
+
+.app-dark .p-inputtext,
+.app-dark .p-password-input {
+  color: var(--app-text-color) !important;
+  background: var(--app-surface-1) !important;
+  border-color: var(--app-surface-border) !important;
+}

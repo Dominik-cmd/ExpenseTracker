@@ -1,0 +1,22 @@
+# Secrets - never commit
+.env
+
+# Build outputs
+**/bin/
+**/obj/
+**/node_modules/
+**/.angular/
+
+# Rider / VS / VSCode
+.idea/
+.vs/
+*.user
+*.suo
+.vscode/
+
+# Docker local overrides
+docker-compose.override.yml
+
+# OS
+.DS_Store
+Thumbs.db
