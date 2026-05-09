@@ -93,6 +93,7 @@ export interface Category {
   sortOrder: number;
   isSystem: boolean;
   excludeFromExpenses: boolean;
+  excludeFromIncome: boolean;
   parentCategoryId?: string | null;
   subCategories: Category[];
 }
@@ -110,6 +111,7 @@ export interface UpdateCategoryRequest {
   icon?: string | null;
   sortOrder?: number | null;
   excludeFromExpenses?: boolean | null;
+  excludeFromIncome?: boolean | null;
 }
 
 export interface DeleteCategoryRequest {

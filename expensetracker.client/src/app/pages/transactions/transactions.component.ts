@@ -71,17 +71,17 @@ const TRANSACTIONS_FALLBACK: PagedResult<Transaction> = {
 
 const CATEGORIES_FALLBACK: Category[] = [
   {
-    id: 'groceries', name: 'Groceries', color: '#10b981', icon: 'pi pi-shopping-basket', sortOrder: 1, isSystem: true, excludeFromExpenses: false, parentCategoryId: null,
+    id: 'groceries', name: 'Groceries', color: '#10b981', icon: 'pi pi-shopping-basket', sortOrder: 1, isSystem: true, excludeFromExpenses: false, excludeFromIncome: false, parentCategoryId: null,
     subCategories: [
-      { id: 'groceries-supermarket', name: 'Supermarket', color: '#10b981', icon: 'pi pi-shop', sortOrder: 1, isSystem: false, excludeFromExpenses: false, parentCategoryId: 'groceries', subCategories: [] }
+      { id: 'groceries-supermarket', name: 'Supermarket', color: '#10b981', icon: 'pi pi-shop', sortOrder: 1, isSystem: false, excludeFromExpenses: false, excludeFromIncome: false, parentCategoryId: 'groceries', subCategories: [] }
     ]
   },
   {
-    id: 'fuel', name: 'Fuel', color: '#3b82f6', icon: 'pi pi-car', sortOrder: 2, isSystem: true, excludeFromExpenses: false, parentCategoryId: null,
+    id: 'fuel', name: 'Fuel', color: '#3b82f6', icon: 'pi pi-car', sortOrder: 2, isSystem: true, excludeFromExpenses: false, excludeFromIncome: false, parentCategoryId: null,
     subCategories: []
   },
   {
-    id: 'income', name: 'Income', color: '#8b5cf6', icon: 'pi pi-wallet', sortOrder: 3, isSystem: true, excludeFromExpenses: false, parentCategoryId: null,
+    id: 'income', name: 'Income', color: '#8b5cf6', icon: 'pi pi-wallet', sortOrder: 3, isSystem: true, excludeFromExpenses: false, excludeFromIncome: false, parentCategoryId: null,
     subCategories: []
   }
 ];
@@ -182,7 +182,7 @@ const TRANSACTION_TYPE_OPTIONS = ['Purchase', 'Transfer', 'Withdrawal', 'Fee', '
       </p-table>
     </p-card>
 
-    <p-sidebar [(visible)]="filtersSidebarVisible" position="right" styleClass="w-full md:w-25rem">
+    <p-sidebar [(visible)]="filtersSidebarVisible" position="right" [dismissible]="false" styleClass="w-full md:w-25rem">
       <ng-template pTemplate="header">
         <div class="font-semibold text-lg">Filters</div>
       </ng-template>

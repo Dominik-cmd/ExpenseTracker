@@ -275,9 +275,12 @@ public sealed class AnalyticsController(AppDbContext dbContext, ILogger<Analytic
     private static bool IsExcludedFromExpenses(Transaction transaction)
         => transaction.Category.ExcludeFromExpenses || transaction.Category.ParentCategory?.ExcludeFromExpenses == true;
 
+    private static bool IsExcludedFromIncome(Transaction transaction)
+        => transaction.Category.ExcludeFromIncome || transaction.Category.ParentCategory?.ExcludeFromIncome == true;
+
     private static IncomeWidget BuildIncomeWidget(List<Transaction> allTransactions, DateTime now)
     {
-        var income = allTransactions.Where(x => x.Direction == Direction.Credit).ToList();
+        var income = allTransactions.Where(x => x.Direction == Direction.Credit && !IsExcludedFromIncome(x)).ToList();
         var spending = allTransactions.Where(x => x.Direction == Direction.Debit && !IsExcludedFromExpenses(x)).ToList();
 
         var currentMonthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);

@@ -22,20 +22,20 @@ interface CategoryFormModel {
 
 const CATEGORIES_FALLBACK: Category[] = [
   {
-    id: 'groceries', name: 'Groceries', color: '#10b981', icon: 'pi pi-shopping-basket', sortOrder: 1, isSystem: true, excludeFromExpenses: false, parentCategoryId: null,
+    id: 'groceries', name: 'Groceries', color: '#10b981', icon: 'pi pi-shopping-basket', sortOrder: 1, isSystem: true, excludeFromExpenses: false, excludeFromIncome: false, parentCategoryId: null,
     subCategories: [
-      { id: 'mercator', name: 'Mercator', color: '#10b981', icon: 'pi pi-shop', sortOrder: 1, isSystem: false, excludeFromExpenses: false, parentCategoryId: 'groceries', subCategories: [] },
-      { id: 'hofer', name: 'Hofer', color: '#34d399', icon: 'pi pi-shop', sortOrder: 2, isSystem: false, excludeFromExpenses: false, parentCategoryId: 'groceries', subCategories: [] }
+      { id: 'mercator', name: 'Mercator', color: '#10b981', icon: 'pi pi-shop', sortOrder: 1, isSystem: false, excludeFromExpenses: false, excludeFromIncome: false, parentCategoryId: 'groceries', subCategories: [] },
+      { id: 'hofer', name: 'Hofer', color: '#34d399', icon: 'pi pi-shop', sortOrder: 2, isSystem: false, excludeFromExpenses: false, excludeFromIncome: false, parentCategoryId: 'groceries', subCategories: [] }
     ]
   },
   {
-    id: 'fuel', name: 'Fuel', color: '#3b82f6', icon: 'pi pi-car', sortOrder: 2, isSystem: true, excludeFromExpenses: false, parentCategoryId: null,
+    id: 'fuel', name: 'Fuel', color: '#3b82f6', icon: 'pi pi-car', sortOrder: 2, isSystem: true, excludeFromExpenses: false, excludeFromIncome: false, parentCategoryId: null,
     subCategories: [
-      { id: 'omv', name: 'OMV', color: '#60a5fa', icon: 'pi pi-car', sortOrder: 1, isSystem: false, excludeFromExpenses: false, parentCategoryId: 'fuel', subCategories: [] }
+      { id: 'omv', name: 'OMV', color: '#60a5fa', icon: 'pi pi-car', sortOrder: 1, isSystem: false, excludeFromExpenses: false, excludeFromIncome: false, parentCategoryId: 'fuel', subCategories: [] }
     ]
   },
   {
-    id: 'subscriptions', name: 'Subscriptions', color: '#8b5cf6', icon: 'pi pi-bolt', sortOrder: 3, isSystem: false, excludeFromExpenses: false, parentCategoryId: null,
+    id: 'subscriptions', name: 'Subscriptions', color: '#8b5cf6', icon: 'pi pi-bolt', sortOrder: 3, isSystem: false, excludeFromExpenses: false, excludeFromIncome: false, parentCategoryId: null,
     subCategories: []
   }
 ];
@@ -65,7 +65,8 @@ const CATEGORIES_FALLBACK: Category[] = [
               </div>
               <div class="flex gap-2 align-items-center">
                 <p-tag [value]="category.isSystem ? 'System' : 'Custom'" [severity]="category.isSystem ? 'secondary' : 'success'"></p-tag>
-                <p-tag *ngIf="category.excludeFromExpenses" value="Excluded" severity="warn" icon="pi pi-eye-slash"></p-tag>
+                <p-tag *ngIf="category.excludeFromExpenses" value="Excl. expenses" severity="warn" icon="pi pi-eye-slash"></p-tag>
+                <p-tag *ngIf="category.excludeFromIncome" value="Excl. income" severity="warn" icon="pi pi-arrow-circle-up"></p-tag>
               </div>
             </div>
           </ng-template>
@@ -74,7 +75,8 @@ const CATEGORIES_FALLBACK: Category[] = [
             <p-button icon="pi pi-plus" size="small" [text]="true" (onClick)="openCreateDialog(category.id)"></p-button>
             <p-button icon="pi pi-chevron-down" size="small" [text]="true" [severity]="isExpanded(category.id) ? 'contrast' : 'secondary'" (onClick)="toggleExpanded(category.id)"></p-button>
             <p-button icon="pi pi-pencil" size="small" [text]="true" [disabled]="category.isSystem" (onClick)="openEditDialog(category)"></p-button>
-            <p-button [icon]="category.excludeFromExpenses ? 'pi pi-eye' : 'pi pi-eye-slash'" size="small" [text]="true" [severity]="category.excludeFromExpenses ? 'warn' : 'secondary'" [pTooltip]="category.excludeFromExpenses ? 'Include in expenses' : 'Exclude from expenses'" tooltipPosition="top" (onClick)="toggleExcludeFromExpenses(category)"></p-button>
+            <p-button [icon]="category.excludeFromExpenses ? 'pi pi-eye' : 'pi pi-eye-slash'" size="small" [text]="true" [severity]="category.excludeFromExpenses ? 'warn' : 'secondary'" [pTooltip]="category.excludeFromExpenses ? 'Include in expenses' : 'Exclude from expenses'" tooltipPosition="top" [disabled]="category.isSystem" (onClick)="toggleExcludeFromExpenses(category)"></p-button>
+            <p-button [icon]="category.excludeFromIncome ? 'pi pi-arrow-circle-up' : 'pi pi-arrow-up'" size="small" [text]="true" [severity]="category.excludeFromIncome ? 'warn' : 'secondary'" [pTooltip]="category.excludeFromIncome ? 'Include in income' : 'Exclude from income'" tooltipPosition="top" [disabled]="category.isSystem" (onClick)="toggleExcludeFromIncome(category)"></p-button>
             <p-button icon="pi pi-trash" size="small" [text]="true" severity="danger" [disabled]="category.isSystem" (onClick)="openDeleteDialog(category)"></p-button>
           </div>
 
@@ -327,6 +329,21 @@ export class CategoriesComponent {
     this.deleteDialogVisible = true;
   }
 
+  protected toggleExcludeFromIncome(category: Category): void {
+    const newValue = !category.excludeFromIncome;
+    this.apiService.updateCategory(category.id, { excludeFromIncome: newValue } as UpdateCategoryRequest).pipe(
+      catchError(() => of({ ...category, excludeFromIncome: newValue } as Category)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe((updated) => {
+      this.upsertCategory(updated);
+      this.messageService.add({
+        severity: newValue ? 'warn' : 'success',
+        summary: newValue ? 'Excluded from income' : 'Included in income',
+        detail: `"${category.name}" will ${newValue ? 'no longer' : 'now'} count toward income totals and reports.`
+      });
+    });
+  }
+
   protected toggleExcludeFromExpenses(category: Category): void {
     const newValue = !category.excludeFromExpenses;
     this.apiService.updateCategory(category.id, { excludeFromExpenses: newValue } as UpdateCategoryRequest).pipe(
@@ -422,6 +439,7 @@ export class CategoriesComponent {
       sortOrder: 99,
       isSystem: false,
       excludeFromExpenses: false,
+      excludeFromIncome: false,
       parentCategoryId: payload.parentCategoryId ?? null,
       subCategories: []
     };

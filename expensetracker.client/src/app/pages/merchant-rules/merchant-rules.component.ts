@@ -24,9 +24,9 @@ const RULES_FALLBACK: MerchantRule[] = [
 ];
 
 const CATEGORIES_FALLBACK: Category[] = [
-  { id: 'groceries', name: 'Groceries', color: '#10b981', icon: 'pi pi-shopping-basket', sortOrder: 1, isSystem: true, excludeFromExpenses: false, parentCategoryId: null, subCategories: [] },
-  { id: 'fuel', name: 'Fuel', color: '#3b82f6', icon: 'pi pi-car', sortOrder: 2, isSystem: true, excludeFromExpenses: false, parentCategoryId: null, subCategories: [] },
-  { id: 'subscriptions', name: 'Subscriptions', color: '#8b5cf6', icon: 'pi pi-bolt', sortOrder: 3, isSystem: false, excludeFromExpenses: false, parentCategoryId: null, subCategories: [] }
+  { id: 'groceries', name: 'Groceries', color: '#10b981', icon: 'pi pi-shopping-basket', sortOrder: 1, isSystem: true, excludeFromExpenses: false, excludeFromIncome: false, parentCategoryId: null, subCategories: [] },
+  { id: 'fuel', name: 'Fuel', color: '#3b82f6', icon: 'pi pi-car', sortOrder: 2, isSystem: true, excludeFromExpenses: false, excludeFromIncome: false, parentCategoryId: null, subCategories: [] },
+  { id: 'subscriptions', name: 'Subscriptions', color: '#8b5cf6', icon: 'pi pi-bolt', sortOrder: 3, isSystem: false, excludeFromExpenses: false, excludeFromIncome: false, parentCategoryId: null, subCategories: [] }
 ];
 
 @Component({

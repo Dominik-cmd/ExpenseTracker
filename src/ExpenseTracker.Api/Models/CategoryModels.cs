@@ -13,12 +13,13 @@ public sealed record CategoryDto(
     int SortOrder,
     bool IsSystem,
     bool ExcludeFromExpenses,
+    bool ExcludeFromIncome,
     Guid? ParentCategoryId,
     List<CategoryDto> SubCategories);
 
 public sealed record CreateCategoryRequest(string Name, string? Color, string? Icon, Guid? ParentCategoryId);
 
-public sealed record UpdateCategoryRequest(string? Name, string? Color, string? Icon, int? SortOrder, bool? ExcludeFromExpenses);
+public sealed record UpdateCategoryRequest(string? Name, string? Color, string? Icon, int? SortOrder, bool? ExcludeFromExpenses, bool? ExcludeFromIncome);
 
 public sealed record DeleteCategoryRequest(Guid ReassignToCategoryId);
 }

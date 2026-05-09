@@ -47,6 +47,9 @@ public sealed class SeedDataService : IHostedService
         await _dbContext.Database.ExecuteSqlRawAsync(
             "ALTER TABLE categories ADD COLUMN IF NOT EXISTS exclude_from_expenses BOOLEAN NOT NULL DEFAULT FALSE",
             cancellationToken);
+        await _dbContext.Database.ExecuteSqlRawAsync(
+            "ALTER TABLE categories ADD COLUMN IF NOT EXISTS exclude_from_income BOOLEAN NOT NULL DEFAULT FALSE",
+            cancellationToken);
     }
 
     private async Task SeedUserAsync(string initialPassword, CancellationToken cancellationToken)

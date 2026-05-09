@@ -91,6 +91,7 @@ public sealed class CategoriesController(AppDbContext dbContext, ILogger<Categor
             if (request.Icon is not null) { category.Icon = request.Icon; changes[nameof(category.Icon)] = request.Icon; }
             if (request.SortOrder.HasValue) { category.SortOrder = request.SortOrder.Value; changes[nameof(category.SortOrder)] = request.SortOrder.Value; }
             if (request.ExcludeFromExpenses.HasValue) { category.ExcludeFromExpenses = request.ExcludeFromExpenses.Value; changes[nameof(category.ExcludeFromExpenses)] = request.ExcludeFromExpenses.Value; }
+            if (request.ExcludeFromIncome.HasValue) { category.ExcludeFromIncome = request.ExcludeFromIncome.Value; changes[nameof(category.ExcludeFromIncome)] = request.ExcludeFromIncome.Value; }
             category.UpdatedAt = DateTime.UtcNow;
 
             AddAuditLog(category.Id, "Patch", changes);
