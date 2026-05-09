@@ -130,6 +130,7 @@ export interface MerchantRule {
 
 export interface UpdateMerchantRuleRequest {
   categoryId: string;
+  applyToExistingTransactions?: boolean;
 }
 
 export interface RawMessage {

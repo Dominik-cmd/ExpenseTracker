@@ -1,5 +1,6 @@
 using ExpenseTracker.Api.Models;
 using ExpenseTracker.Api.Services;
+using ExpenseTracker.Core.Enums;
 using ExpenseTracker.Infrastructure;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -45,6 +46,17 @@ public sealed class MerchantRulesController(AppDbContext dbContext, ILogger<Merc
 
             rule.CategoryId = request.CategoryId;
             rule.UpdatedAt = DateTime.UtcNow;
+
+            if (request.ApplyToExistingTransactions)
+            {
+                await dbContext.Transactions
+                    .Where(x => x.MerchantNormalized == rule.MerchantNormalized && !x.IsDeleted)
+                    .ExecuteUpdateAsync(s => s
+                        .SetProperty(x => x.CategoryId, request.CategoryId)
+                        .SetProperty(x => x.CategorySource, CategorySource.Rule)
+                        .SetProperty(x => x.UpdatedAt, DateTime.UtcNow), ct);
+            }
+
             await dbContext.SaveChangesAsync(ct);
             await dbContext.Entry(rule).Reference(x => x.Category).LoadAsync(ct);
             await dbContext.Entry(rule.Category).Reference(x => x.ParentCategory).LoadAsync(ct);

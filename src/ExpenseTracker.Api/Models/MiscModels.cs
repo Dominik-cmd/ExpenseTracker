@@ -18,7 +18,7 @@ public sealed record MerchantRuleDto(
     DateTime? LastHitAt,
     DateTime CreatedAt);
 
-public sealed record UpdateMerchantRuleRequest(Guid CategoryId);
+public sealed record UpdateMerchantRuleRequest(Guid CategoryId, bool ApplyToExistingTransactions = false);
 
 public sealed record RawMessageDto(
     Guid Id,

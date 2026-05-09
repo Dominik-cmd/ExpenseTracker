@@ -6,6 +6,7 @@ import { catchError, finalize, of } from 'rxjs';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
+import { CheckboxModule } from 'primeng/checkbox';
 import { TableModule } from 'primeng/table';
 import { TagModule } from 'primeng/tag';
 
@@ -31,7 +32,7 @@ const CATEGORIES_FALLBACK: Category[] = [
 @Component({
   standalone: true,
   selector: 'app-merchant-rules',
-  imports: [CommonModule, FormsModule, ButtonModule, CardModule, TableModule, TagModule],
+  imports: [CommonModule, FormsModule, ButtonModule, CardModule, CheckboxModule, TableModule, TagModule],
   template: `
     <p-card header="Merchant rules" subheader="Inline tune the category each normalized merchant should map to.">
       <p-table [value]="rules()" responsiveLayout="scroll">
@@ -56,6 +57,10 @@ const CATEGORIES_FALLBACK: Category[] = [
                 <select class="native-select" [(ngModel)]="editingCategoryId">
                   <option *ngFor="let option of categoryOptions()" [value]="option.id">{{ option.label }}</option>
                 </select>
+                <div class="flex align-items-center gap-2 mt-2">
+                  <p-checkbox [(ngModel)]="editingApplyToExisting" [binary]="true" inputId="applyExisting"></p-checkbox>
+                  <label for="applyExisting" class="text-sm" style="cursor:pointer">Apply to existing transactions</label>
+                </div>
               </ng-container>
               <ng-template #readonlyCategory>{{ rule.parentCategoryName || rule.categoryName }}</ng-template>
             </td>
@@ -105,6 +110,7 @@ export class MerchantRulesComponent {
 
   protected editingRuleId: string | null = null;
   protected editingCategoryId = '';
+  protected editingApplyToExisting = false;
   protected savingRuleId: string | null = null;
 
   constructor() {
@@ -115,11 +121,13 @@ export class MerchantRulesComponent {
   protected startEdit(rule: MerchantRule): void {
     this.editingRuleId = rule.id;
     this.editingCategoryId = rule.categoryId;
+    this.editingApplyToExisting = false;
   }
 
   protected cancelEdit(): void {
     this.editingRuleId = null;
     this.editingCategoryId = '';
+    this.editingApplyToExisting = false;
   }
 
   protected saveRule(rule: MerchantRule): void {
@@ -128,13 +136,16 @@ export class MerchantRulesComponent {
     }
 
     this.savingRuleId = rule.id;
-    this.apiService.updateMerchantRule(rule.id, { categoryId: this.editingCategoryId }).pipe(
+    this.apiService.updateMerchantRule(rule.id, { categoryId: this.editingCategoryId, applyToExistingTransactions: this.editingApplyToExisting }).pipe(
       catchError(() => of(this.buildLocalRule(rule, this.editingCategoryId))),
       finalize(() => this.savingRuleId = null),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe((updatedRule) => {
       this.rules.update((rules) => rules.map((item) => item.id === updatedRule.id ? updatedRule : item));
-      this.messageService.add({ severity: 'success', summary: 'Rule updated', detail: `${updatedRule.merchantNormalized} now maps to ${updatedRule.parentCategoryName || updatedRule.categoryName}.` });
+      const detail = this.editingApplyToExisting
+        ? `${updatedRule.merchantNormalized} remapped to ${updatedRule.parentCategoryName || updatedRule.categoryName} — all existing transactions updated.`
+        : `${updatedRule.merchantNormalized} now maps to ${updatedRule.parentCategoryName || updatedRule.categoryName}.`;
+      this.messageService.add({ severity: 'success', summary: 'Rule updated', detail });
       this.cancelEdit();
     });
   }
