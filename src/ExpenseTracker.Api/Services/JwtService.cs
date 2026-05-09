@@ -64,7 +64,7 @@ public sealed class JwtService(IConfiguration configuration)
             ValidateLifetime = true,
             ClockSkew = TimeSpan.FromMinutes(1),
             NameClaimType = JwtRegisteredClaimNames.Name,
-            RoleClaimType = ClaimTypes.Role
+            RoleClaimType = "role"
         };
 
     private byte[] GetSecretKey()
