@@ -159,29 +159,32 @@ public sealed class SeedDataService : IHostedService
             DO $$
             BEGIN
               -- merchant_rules: change unique(merchant_normalized) -> unique(user_id, merchant_normalized)
-              IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='ix_merchant_rules_merchant_normalized') THEN
-                DROP INDEX ix_merchant_rules_merchant_normalized;
+              IF EXISTS (SELECT 1 FROM pg_indexes WHERE lower(indexname)='ix_merchant_rules_merchant_normalized') THEN
+                DROP INDEX IF EXISTS ix_merchant_rules_merchant_normalized;
+                DROP INDEX IF EXISTS "IX_merchant_rules_merchant_normalized";
               END IF;
-              IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='ix_merchant_rules_user_id_merchant_normalized') THEN
+              IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE lower(indexname)='ix_merchant_rules_user_id_merchant_normalized') THEN
                 CREATE UNIQUE INDEX ix_merchant_rules_user_id_merchant_normalized ON merchant_rules (user_id, merchant_normalized);
               END IF;
 
               -- categories: change unique(name, parent_category_id) -> unique(user_id, name, parent_category_id)
-              IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='ix_categories_name_parent_category_id') THEN
-                DROP INDEX ix_categories_name_parent_category_id;
+              IF EXISTS (SELECT 1 FROM pg_indexes WHERE lower(indexname)='ix_categories_name_parent_category_id') THEN
+                DROP INDEX IF EXISTS ix_categories_name_parent_category_id;
+                DROP INDEX IF EXISTS "IX_categories_name_parent_category_id";
               END IF;
-              IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='ix_categories_user_id_name_parent_category_id') THEN
+              IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE lower(indexname)='ix_categories_user_id_name_parent_category_id') THEN
                 CREATE UNIQUE INDEX ix_categories_user_id_name_parent_category_id ON categories (user_id, name, parent_category_id) WHERE parent_category_id IS NOT NULL;
               END IF;
-              IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='ix_categories_user_id_name') THEN
+              IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE lower(indexname)='ix_categories_user_id_name') THEN
                 CREATE UNIQUE INDEX ix_categories_user_id_name ON categories (user_id, name) WHERE parent_category_id IS NULL;
               END IF;
 
               -- llm_providers: change unique(is_enabled) -> unique(user_id, is_enabled)
-              IF EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='ix_llm_providers_is_enabled') THEN
-                DROP INDEX ix_llm_providers_is_enabled;
+              IF EXISTS (SELECT 1 FROM pg_indexes WHERE lower(indexname)='ix_llm_providers_is_enabled') THEN
+                DROP INDEX IF EXISTS ix_llm_providers_is_enabled;
+                DROP INDEX IF EXISTS "IX_llm_providers_is_enabled";
               END IF;
-              IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE indexname='ix_llm_providers_user_id_is_enabled') THEN
+              IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE lower(indexname)='ix_llm_providers_user_id_is_enabled') THEN
                 CREATE UNIQUE INDEX ix_llm_providers_user_id_is_enabled ON llm_providers (user_id) WHERE is_enabled = true;
               END IF;
             END $$;
