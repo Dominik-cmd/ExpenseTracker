@@ -281,9 +281,9 @@ export class DashboardComponent {
     const greens = ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#059669', '#047857', '#065f46', '#14b8a6', '#2dd4bf', '#5eead4'];
     return {
       tooltip: { trigger: 'item', formatter: '{b}: €{c} ({d}%)' },
-      legend: { orient: 'vertical', right: '2%', top: 'middle', itemGap: 10, textStyle: { fontSize: 12 } },
+      legend: { orient: 'horizontal', bottom: 0, type: 'scroll', itemGap: 12, textStyle: { fontSize: 12 } },
       series: [{
-        type: 'pie', radius: ['38%', '65%'], center: ['38%', '50%'],
+        type: 'pie', radius: ['35%', '62%'], center: ['50%', '45%'],
         avoidLabelOverlap: true, label: { show: false },
         emphasis: { label: { show: true, fontSize: 13, fontWeight: 'bold' } },
         data: sources.map((s, i) => ({ name: s.name, value: s.totalAmount, itemStyle: { color: greens[i % greens.length] } }))
