@@ -42,6 +42,14 @@ const LLM_SETTINGS_FALLBACK: LlmSettings = {
         [loading]="busyKey() === 're-categorize'"
         (onClick)="recategorizeUncategorized()">
       </p-button>
+      <p-button
+        label="Regenerate narratives"
+        icon="pi pi-sparkles"
+        severity="secondary"
+        [outlined]="true"
+        [loading]="busyKey() === 'regenerate-narratives'"
+        (onClick)="regenerateNarratives()">
+      </p-button>
       <p-button label="Disable all providers" icon="pi pi-stop" severity="secondary" [outlined]="true" [loading]="busyKey() === 'disable-all'" (onClick)="disableAll()"></p-button>
     </div>
 
@@ -202,6 +210,17 @@ export class LlmSettingsComponent {
         summary: result.success ? 'Connection OK' : 'Connection failed',
         detail: result.success ? `${provider.name} replied in ${Math.round(result.latencyMs)} ms.` : (result.errorMessage ?? 'Provider did not return a result.')
       });
+    });
+  }
+
+  protected regenerateNarratives(): void {
+    this.busyKey.set('regenerate-narratives');
+    this.apiService.regenerateNarratives().pipe(
+      catchError(() => of(void 0 as void)),
+      finalize(() => this.busyKey.set(null)),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe(() => {
+      this.messageService.add({ severity: 'success', summary: 'Queued', detail: 'Narrative regeneration queued — the LLM will update them in the background.' });
     });
   }
 
