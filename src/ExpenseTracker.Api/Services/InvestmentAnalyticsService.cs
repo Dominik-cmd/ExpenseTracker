@@ -235,16 +235,16 @@ public sealed class InvestmentAnalyticsService(AppDbContext dbContext)
             .OrderByDescending(t => t.TransactionDate)
             .Take(limit)
             .Select(t => new RecentActivityDto(
-                Date: new DateTimeOffset(t.TransactionDate, TimeSpan.Zero),
-                AccountId: t.AccountId,
-                AccountDisplayName: t.Account.DisplayName,
-                ProviderType: "ibkr",
-                ActivityType: t.TransactionType,
-                Description: t.Description ?? $"{t.TransactionType} {t.Instrument!.Symbol}",
-                Amount: t.NetAmount,
-                Currency: t.Currency,
-                Quantity: t.Quantity,
-                InstrumentSymbol: t.Instrument != null ? t.Instrument.Symbol : null))
+                new DateTimeOffset(t.TransactionDate, TimeSpan.Zero),
+                t.AccountId,
+                t.Account.DisplayName,
+                "ibkr",
+                t.TransactionType,
+                t.Description ?? (t.TransactionType + " " + t.Instrument!.Symbol),
+                t.NetAmount,
+                t.Currency,
+                t.Quantity,
+                t.Instrument != null ? t.Instrument.Symbol : null))
             .ToListAsync(ct);
 
         var manualUpdates = await dbContext.ManualBalanceHistories
@@ -254,16 +254,16 @@ public sealed class InvestmentAnalyticsService(AppDbContext dbContext)
             .OrderByDescending(h => h.RecordedAt)
             .Take(limit)
             .Select(h => new RecentActivityDto(
-                Date: new DateTimeOffset(h.RecordedAt, TimeSpan.Zero),
-                AccountId: h.AccountId,
-                AccountDisplayName: h.Account.DisplayName,
-                ProviderType: "manual",
-                ActivityType: "BALANCE_UPDATE",
-                Description: $"Updated {h.Account.DisplayName}: {h.Currency}{h.Balance}" + (h.Note != null ? $" ({h.Note})" : ""),
-                Amount: h.Balance,
-                Currency: h.Currency,
-                Quantity: null,
-                InstrumentSymbol: null))
+                new DateTimeOffset(h.RecordedAt, TimeSpan.Zero),
+                h.AccountId,
+                h.Account.DisplayName,
+                "manual",
+                "BALANCE_UPDATE",
+                "Updated " + h.Account.DisplayName + ": " + h.Currency + h.Balance + (h.Note != null ? " (" + h.Note + ")" : ""),
+                h.Balance,
+                h.Currency,
+                null,
+                null))
             .ToListAsync(ct);
 
         return ibkrTxns.Concat(manualUpdates)
