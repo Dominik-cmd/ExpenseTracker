@@ -87,8 +87,10 @@ const CATEGORIES_FALLBACK: Category[] = [
               <div class="flex align-items-center gap-2">
                 <i [class]="subCategory.icon || 'pi pi-tag'" [style.color]="subCategory.color || category.color || 'var(--primary-color)'"></i>
                 <span>{{ subCategory.name }}</span>
+                <p-tag *ngIf="subCategory.excludeFromIncome" value="Excl. income" severity="warn" icon="pi pi-arrow-circle-up" [style]="{ fontSize: '0.7rem' }"></p-tag>
               </div>
               <div class="flex gap-2">
+                <p-button [icon]="subCategory.excludeFromIncome ? 'pi pi-arrow-circle-up' : 'pi pi-arrow-up'" size="small" [text]="true" [severity]="subCategory.excludeFromIncome ? 'warn' : 'secondary'" [pTooltip]="subCategory.excludeFromIncome ? 'Include in income' : 'Exclude from income'" tooltipPosition="top" (onClick)="toggleExcludeFromIncome(subCategory)"></p-button>
                 <p-button icon="pi pi-pencil" size="small" [text]="true" (onClick)="openEditDialog(subCategory)"></p-button>
                 <p-button icon="pi pi-trash" size="small" [text]="true" severity="danger" (onClick)="openDeleteDialog(subCategory)"></p-button>
               </div>
