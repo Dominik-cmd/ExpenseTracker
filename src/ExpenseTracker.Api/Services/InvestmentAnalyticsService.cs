@@ -214,15 +214,17 @@ public sealed class InvestmentAnalyticsService(AppDbContext dbContext)
 
     public async Task<List<HistoryPointDto>> GetHistoryAsync(Guid userId, DateOnly from, DateOnly to, CancellationToken ct)
     {
-        var history = await dbContext.PortfolioHistories
+        var raw = await dbContext.PortfolioHistories
             .AsNoTracking()
             .Where(h => h.Account.UserId == userId && h.SnapshotDate >= from && h.SnapshotDate <= to)
+            .Select(h => new { h.SnapshotDate, h.MarketValue })
+            .ToListAsync(ct);
+
+        return raw
             .GroupBy(h => h.SnapshotDate)
             .Select(g => new HistoryPointDto(g.Key, g.Sum(h => h.MarketValue)))
             .OrderBy(h => h.Date)
-            .ToListAsync(ct);
-
-        return history;
+            .ToList();
     }
 
     public async Task<List<RecentActivityDto>> GetRecentActivityAsync(Guid userId, int limit, CancellationToken ct)
