@@ -213,6 +213,41 @@ public sealed class SeedDataService : IHostedService
             CREATE INDEX IF NOT EXISTS ix_summaries_scope ON summaries (user_id, summary_type, scope, generated_at DESC);
             CREATE INDEX IF NOT EXISTS ix_summaries_user_id ON summaries (user_id);
             """, cancellationToken);
+
+        // Backfill canonical colors for all top-level categories across all users
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            UPDATE categories
+            SET color = CASE name
+                WHEN 'Housing'       THEN '#6366f1'
+                WHEN 'Utilities'     THEN '#0ea5e9'
+                WHEN 'Groceries'     THEN '#10b981'
+                WHEN 'Dining'        THEN '#f97316'
+                WHEN 'Transportation'THEN '#3b82f6'
+                WHEN 'Fuel'          THEN '#eab308'
+                WHEN 'Healthcare'    THEN '#ef4444'
+                WHEN 'Insurance'     THEN '#8b5cf6'
+                WHEN 'Entertainment' THEN '#ec4899'
+                WHEN 'Subscriptions' THEN '#14b8a6'
+                WHEN 'Shopping'      THEN '#f59e0b'
+                WHEN 'Education'     THEN '#06b6d4'
+                WHEN 'Personal Care' THEN '#a855f7'
+                WHEN 'Gifts'         THEN '#f43f5e'
+                WHEN 'Travel'        THEN '#84cc16'
+                WHEN 'Savings'       THEN '#22c55e'
+                WHEN 'Investments'   THEN '#2dd4bf'
+                WHEN 'Taxes'         THEN '#64748b'
+                WHEN 'Income'        THEN '#10b981'
+                WHEN 'Uncategorized' THEN '#94a3b8'
+            END,
+            updated_at = NOW()
+            WHERE name IN (
+                'Housing','Utilities','Groceries','Dining','Transportation','Fuel',
+                'Healthcare','Insurance','Entertainment','Subscriptions','Shopping',
+                'Education','Personal Care','Gifts','Travel','Savings','Investments',
+                'Taxes','Income','Uncategorized'
+            )
+            AND parent_category_id IS NULL;
+            """, cancellationToken);
     }
 
     private async Task<User?> SeedUserAsync(string initialPassword, CancellationToken cancellationToken)
@@ -240,28 +275,28 @@ public sealed class SeedDataService : IHostedService
             .Where(c => c.UserId == userId)
             .ToDictionaryAsync(category => (category.Name, category.ParentCategoryId), cancellationToken);
 
-        var topLevelDefinitions = new (string Name, int SortOrder, bool IsSystem)[]
+        var topLevelDefinitions = new (string Name, int SortOrder, bool IsSystem, string Color)[]
         {
-            ("Housing", 1, false),
-            ("Utilities", 2, false),
-            ("Groceries", 3, false),
-            ("Dining", 4, false),
-            ("Transportation", 5, false),
-            ("Fuel", 6, false),
-            ("Healthcare", 7, false),
-            ("Insurance", 8, false),
-            ("Entertainment", 9, false),
-            ("Subscriptions", 10, false),
-            ("Shopping", 11, false),
-            ("Education", 12, false),
-            ("Personal Care", 13, false),
-            ("Gifts", 14, false),
-            ("Travel", 15, false),
-            ("Savings", 16, false),
-            ("Investments", 17, false),
-            ("Taxes", 18, false),
-            ("Income", 19, true),
-            ("Uncategorized", 99, true)
+            ("Housing",        1,  false, "#6366f1"),
+            ("Utilities",      2,  false, "#0ea5e9"),
+            ("Groceries",      3,  false, "#10b981"),
+            ("Dining",         4,  false, "#f97316"),
+            ("Transportation", 5,  false, "#3b82f6"),
+            ("Fuel",           6,  false, "#eab308"),
+            ("Healthcare",     7,  false, "#ef4444"),
+            ("Insurance",      8,  false, "#8b5cf6"),
+            ("Entertainment",  9,  false, "#ec4899"),
+            ("Subscriptions",  10, false, "#14b8a6"),
+            ("Shopping",       11, false, "#f59e0b"),
+            ("Education",      12, false, "#06b6d4"),
+            ("Personal Care",  13, false, "#a855f7"),
+            ("Gifts",          14, false, "#f43f5e"),
+            ("Travel",         15, false, "#84cc16"),
+            ("Savings",        16, false, "#22c55e"),
+            ("Investments",    17, false, "#2dd4bf"),
+            ("Taxes",          18, false, "#64748b"),
+            ("Income",         19, true,  "#10b981"),
+            ("Uncategorized",  99, true,  "#94a3b8")
         };
 
         foreach (var definition in topLevelDefinitions)
@@ -275,6 +310,7 @@ public sealed class SeedDataService : IHostedService
             {
                 UserId = userId,
                 Name = definition.Name,
+                Color = definition.Color,
                 SortOrder = definition.SortOrder,
                 IsSystem = definition.IsSystem
             };
