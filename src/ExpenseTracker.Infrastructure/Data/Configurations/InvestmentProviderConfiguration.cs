@@ -16,6 +16,7 @@ public sealed class InvestmentProviderConfiguration : IEntityTypeConfiguration<I
             .OnDelete(DeleteBehavior.Cascade);
 
         builder.Property(p => p.ProviderType).HasConversion<string>();
+        builder.Property(p => p.ExtraConfig).HasColumnType("jsonb");
 
         builder.HasIndex(p => new { p.UserId, p.ProviderType }).IsUnique();
     }
