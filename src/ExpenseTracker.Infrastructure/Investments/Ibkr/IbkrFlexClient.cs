@@ -12,6 +12,12 @@ public sealed class IbkrFlexClient(IHttpClientFactory httpClientFactory, ILogger
         var http = httpClientFactory.CreateClient("IbkrFlex");
 
         var requestUrl = $"{BaseUrl}/SendRequest?t={Uri.EscapeDataString(token)}&q={Uri.EscapeDataString(queryId)}&v=3";
+        var maskedToken = token.Length > 6 ? token[..4] + "***" + token[^2..] : "***";
+        logger.LogDebug("IBKR SendRequest → {Url}", $"{BaseUrl}/SendRequest?t={maskedToken}&q={queryId}&v=3");
+
+        var headers = http.DefaultRequestHeaders;
+        logger.LogDebug("IBKR request headers — User-Agent: {UA}, Accept: {Accept}",
+            headers.UserAgent.ToString(), headers.Accept.ToString());
 
         const int maxSendAttempts = 5;
         var sendDelay = TimeSpan.FromSeconds(3);
@@ -19,6 +25,7 @@ public sealed class IbkrFlexClient(IHttpClientFactory httpClientFactory, ILogger
         for (var sendAttempt = 0; sendAttempt < maxSendAttempts; sendAttempt++)
         {
             requestResponse = await http.GetStringAsync(requestUrl, ct);
+            logger.LogDebug("IBKR SendRequest response (attempt {Attempt}): {Body}", sendAttempt + 1, requestResponse);
             if (!IsTransientSendError(requestResponse))
                 break;
 

@@ -65,7 +65,10 @@ builder.Services.AddScoped<IbkrFlexProvider>();
 builder.Services.AddScoped<IbkrPersistenceService>();
 builder.Services.AddScoped<ManualInvestmentProvider>();
 builder.Services.AddHostedService<InvestmentSyncWorker>();
-builder.Services.AddHttpClient("IbkrFlex");
+builder.Services.AddHttpClient("IbkrFlex", client =>
+{
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; ExpenseTracker/1.0)");
+});
 
 var keyPath = Environment.GetEnvironmentVariable("DATA_PROTECTION_KEY_PATH")
     ?? Path.Combine(builder.Environment.ContentRootPath, "data-protection-keys");
