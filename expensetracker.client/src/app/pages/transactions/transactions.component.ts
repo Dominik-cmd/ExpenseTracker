@@ -2,7 +2,7 @@ import { CommonModule, DOCUMENT } from '@angular/common';
 import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { catchError, finalize, map, of } from 'rxjs';
+import { catchError, finalize, map, of, Subject, switchMap } from 'rxjs';
 import { ConfirmationService, MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
@@ -30,8 +30,8 @@ interface TransactionFilterState {
   to: string;
   categoryIds: string[];
   merchant: string;
-  minAmount: string;
-  maxAmount: string;
+  minAmount: number | null;
+  maxAmount: number | null;
   direction: string;
 }
 
@@ -373,12 +373,28 @@ export class TransactionsComponent {
 
   protected readonly filtersDraft: TransactionFilterState = this.createEmptyFilters();
   private appliedFilters: TransactionFilterState = this.createEmptyFilters();
+  private readonly loadTrigger$ = new Subject<{ page: number; pageSize: number }>();
 
   protected transactionForm: TransactionFormModel = this.createEmptyTransactionForm();
 
   constructor() {
     this.loadCategories();
-    this.loadTransactions(1, this.rows);
+    // switchMap cancels any in-flight request when a new one arrives, preventing
+    // stale responses from overwriting newer filtered results.
+    this.loadTrigger$.pipe(
+      switchMap(({ page, pageSize }) => {
+        this.loading = true;
+        return this.apiService.getTransactions(this.buildServerFilters(page, pageSize)).pipe(
+          catchError(() => of({ ...TRANSACTIONS_FALLBACK, page, pageSize }))
+        );
+      }),
+      takeUntilDestroyed(this.destroyRef)
+    ).subscribe((transactions) => {
+      this.loading = false;
+      this.transactions.set(transactions);
+      this.selectedTransactions = [];
+    });
+    this.loadTrigger$.next({ page: 1, pageSize: this.rows });
   }
 
   protected onLazyLoad(event: { first?: number | null; rows?: number | null } | undefined): void {
@@ -571,15 +587,7 @@ export class TransactionsComponent {
   }
 
   private loadTransactions(page: number, pageSize: number): void {
-    this.loading = true;
-    this.apiService.getTransactions(this.buildServerFilters(page, pageSize)).pipe(
-      catchError(() => of({ ...TRANSACTIONS_FALLBACK, page, pageSize })),
-      finalize(() => this.loading = false),
-      takeUntilDestroyed(this.destroyRef)
-    ).subscribe((transactions) => {
-      this.transactions.set(transactions);
-      this.selectedTransactions = [];
-    });
+    this.loadTrigger$.next({ page, pageSize });
   }
 
   private loadCategories(): void {
@@ -683,8 +691,8 @@ export class TransactionsComponent {
       to: '',
       categoryIds: [],
       merchant: '',
-      minAmount: '',
-      maxAmount: '',
+      minAmount: null,
+      maxAmount: null,
       direction: ''
     };
   }
@@ -714,13 +722,9 @@ export class TransactionsComponent {
     return this.flattenCategories(this.categories()).find((category) => category.id === categoryId)?.name ?? 'Parent category';
   }
 
-  private toNumber(value: string): number | undefined {
-    if (value === '') {
-      return undefined;
-    }
-
-    const parsed = Number(value);
-    return Number.isFinite(parsed) ? parsed : undefined;
+  private toNumber(value: number | null | undefined): number | undefined {
+    if (value === null || value === undefined) return undefined;
+    return Number.isFinite(value) ? value : undefined;
   }
 
   private toDateInputValue(value: string): string {
