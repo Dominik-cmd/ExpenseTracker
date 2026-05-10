@@ -16,7 +16,7 @@ public sealed class OtpBankaSmsParser
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
     private static readonly Regex PurchaseRegex = new(
-        @"^POS NAKUP (\d{2}\.\d{2}\.\d{4})\s+(\d{2}:\d{2}),\s*kartica\s*\*{3}\d+,\s*znesek\s*([\d,.]+)\s*EUR,\s*(.+?)(?:,\s*\w+\s+\w{2})?\.?\s*Info:",
+        @"^(?:POS|SPLET/TEL|SPLET) NAKUP (\d{2}\.\d{2}\.\d{4})\s+(\d{2}:\d{2}),\s*kartica\s*\*{3}\d+,\s*znesek\s*([\d,.]+)\s*EUR,\s*(.+?)(?:,\s*\w+\s+\w{2})?\.?\s*Info:",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
     public ParsedSms? Parse(string body)

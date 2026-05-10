@@ -60,6 +60,22 @@ public sealed class SmsParserTests
     }
 
     [Fact]
+    public void Parse_ShouldParseOnlinePurchaseSms()
+    {
+        var sms = "SPLET/TEL NAKUP 10.05.2026 11:06, kartica ***9044, znesek 48,96 EUR, IKEA Slovenia online, Ljubljana SI. Info: +38615834183. OTP banka";
+
+        var result = _parser.Parse(sms);
+
+        result.Should().NotBeNull();
+        result!.Direction.Should().Be(Direction.Debit);
+        result.TransactionType.Should().Be(TransactionType.Purchase);
+        result.Amount.Should().Be(48.96m);
+        result.TransactionDate.Should().Be(new DateTime(2026, 5, 10, 11, 6, 0, DateTimeKind.Utc));
+        result.MerchantRaw.Should().Be("IKEA Slovenia online");
+        result.Notes.Should().BeNull();
+    }
+
+    [Fact]
     public void Parse_ShouldReturnNullForInvalidOrEmptyText()
     {
         _parser.Parse(null!).Should().BeNull();
