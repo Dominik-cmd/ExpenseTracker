@@ -1,6 +1,6 @@
 using System.Net;
 using System.Net.Http.Json;
-using ExpenseTracker.Api.Models;
+using ExpenseTracker.Application.Models;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExpenseTracker.IntegrationTests;

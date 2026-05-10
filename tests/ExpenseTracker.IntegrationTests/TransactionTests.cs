@@ -1,4 +1,4 @@
-using ExpenseTracker.Api.Models;
+using ExpenseTracker.Application.Models;
 using ExpenseTracker.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using System.Net;

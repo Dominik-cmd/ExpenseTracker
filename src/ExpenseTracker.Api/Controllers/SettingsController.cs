@@ -1,119 +1,76 @@
-using System.Security.Cryptography;
-using System.Text.Json;
-using ExpenseTracker.Api.Models;
-using ExpenseTracker.Infrastructure;
+using ExpenseTracker.Application.Interfaces;
+using ExpenseTracker.Application.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
-namespace ExpenseTracker.Api.Controllers
-{
-
+namespace ExpenseTracker.Api.Controllers;
 
 [Authorize]
 [Route("api/settings")]
-public sealed class SettingsController(AppDbContext dbContext, ILogger<SettingsController> logger) : ApiControllerBase
+public sealed class SettingsController(ISettingsService settingsService) : ApiControllerBase
 {
-    [HttpGet("webhook-secret")]
-    public async Task<ActionResult<object>> GetWebhookSecretAsync(CancellationToken ct)
+  [HttpGet("webhook-secret")]
+  public async Task<IActionResult> GetWebhookSecretAsync(CancellationToken ct)
+  {
+    var userId = GetCurrentUserId();
+    if (userId is null)
     {
-        try
-        {
-            var userId = GetCurrentUserId();
-            if (userId is null) return Unauthorized();
-            var secret = await GetSettingAsync("sms_webhook_secret", userId.Value, ct);
-            return secret is null ? NotFound() : Ok(new { secret = secret.Value });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to fetch webhook secret.");
-            return Problem(statusCode: StatusCodes.Status500InternalServerError, title: "Unable to fetch webhook secret.");
-        }
+      return Unauthorized();
     }
-
-    [HttpPost("webhook-secret/rotate")]
-    public async Task<ActionResult<object>> RotateWebhookSecretAsync(CancellationToken ct)
+    var secret = await settingsService.GetWebhookSecretAsync(userId.Value, ct);
+    if (secret is null)
     {
-        try
-        {
-            var userId = GetCurrentUserId();
-            if (userId is null) return Unauthorized();
-            var setting = await GetSettingAsync("sms_webhook_secret", userId.Value, ct);
-            if (setting is null)
-            {
-                return NotFound();
-            }
-
-            setting.Value = CreateUrlSafeSecret();
-            setting.UpdatedAt = DateTime.UtcNow;
-            await dbContext.SaveChangesAsync(ct);
-            return Ok(new { secret = setting.Value });
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to rotate webhook secret.");
-            return Problem(statusCode: StatusCodes.Status500InternalServerError, title: "Unable to rotate webhook secret.");
-        }
+      return NotFound();
     }
+    return Ok(new { secret });
+  }
 
-    [HttpGet("sms-senders")]
-    public async Task<ActionResult<List<string>>> GetSmsSendersAsync(CancellationToken ct)
+  [HttpPost("webhook-secret/rotate")]
+  public async Task<IActionResult> RotateWebhookSecretAsync(CancellationToken ct)
+  {
+    var userId = GetCurrentUserId();
+    if (userId is null)
     {
-        try
-        {
-            var userId = GetCurrentUserId();
-            if (userId is null) return Unauthorized();
-            var setting = await GetSettingAsync("sms_senders", userId.Value, ct);
-            return setting is null || string.IsNullOrWhiteSpace(setting.Value)
-                ? NotFound()
-                : Ok(JsonSerializer.Deserialize<List<string>>(setting.Value) ?? []);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to fetch SMS senders.");
-            return Problem(statusCode: StatusCodes.Status500InternalServerError, title: "Unable to fetch SMS senders.");
-        }
+      return Unauthorized();
     }
-
-    [HttpPatch("sms-senders")]
-    public async Task<ActionResult<List<string>>> UpdateSmsSendersAsync([FromBody] UpdateSmsSendersRequest request, CancellationToken ct)
+    var secret = await settingsService.RotateWebhookSecretAsync(userId.Value, ct);
+    if (secret is null)
     {
-        try
-        {
-            var userId = GetCurrentUserId();
-            if (userId is null) return Unauthorized();
-            var setting = await GetSettingAsync("sms_senders", userId.Value, ct);
-            if (setting is null)
-            {
-                return NotFound();
-            }
-
-            var cleaned = request.Senders
-                .Select(s => s.Trim())
-                .Where(s => !string.IsNullOrEmpty(s))
-                .Distinct()
-                .ToList();
-
-            setting.Value = JsonSerializer.Serialize(cleaned);
-            setting.UpdatedAt = DateTime.UtcNow;
-            await dbContext.SaveChangesAsync(ct);
-            return Ok(cleaned);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Failed to update SMS senders.");
-            return Problem(statusCode: StatusCodes.Status500InternalServerError, title: "Unable to update SMS senders.");
-        }
+      return NotFound();
     }
+    return Ok(new { secret });
+  }
 
-    private Task<ExpenseTracker.Core.Entities.Setting?> GetSettingAsync(string key, Guid userId, CancellationToken ct)
-        => dbContext.Settings.FirstOrDefaultAsync(x => x.Key == key && x.UserId == userId, ct);
+  [HttpGet("sms-senders")]
+  public async Task<IActionResult> GetSmsSendersAsync(CancellationToken ct)
+  {
+    var userId = GetCurrentUserId();
+    if (userId is null)
+    {
+      return Unauthorized();
+    }
+    var senders = await settingsService.GetSmsSendersAsync(userId.Value, ct);
+    if (senders is null)
+    {
+      return NotFound();
+    }
+    return Ok(senders);
+  }
 
-    private static string CreateUrlSafeSecret()
-        => Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
-            .TrimEnd('=')
-            .Replace('+', '-')
-            .Replace('/', '_');
+  [HttpPut("sms-senders")]
+  public async Task<IActionResult> UpdateSmsSendersAsync(
+    [FromBody] UpdateSmsSendersRequest request, CancellationToken ct)
+  {
+    var userId = GetCurrentUserId();
+    if (userId is null)
+    {
+      return Unauthorized();
+    }
+    var result = await settingsService.UpdateSmsSendersAsync(userId.Value, request, ct);
+    if (result is null)
+    {
+      return NotFound();
+    }
+    return Ok(result);
+  }
 }
-}
-

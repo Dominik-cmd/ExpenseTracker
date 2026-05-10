@@ -1,96 +1,136 @@
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using ExpenseTracker.Api.Controllers;
-using ExpenseTracker.Api.Models;
+using ExpenseTracker.Application.Interfaces;
+using ExpenseTracker.Application.Models;
+using ExpenseTracker.Application.Services;
 using ExpenseTracker.Core.Entities;
 using FluentAssertions;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 
 namespace ExpenseTracker.UnitTests;
 
 public sealed class CategoryResolutionTests
 {
-    private static readonly Guid TestUserId = Guid.NewGuid();
+  private static readonly Guid TestUserId = Guid.NewGuid();
 
-    [Fact]
-    public async Task CreateAsync_ShouldAllowSecondLevelCategory()
+  private readonly Mock<ICategoryRepository> _categoryRepo = new();
+  private readonly Mock<ITransactionRepository> _transactionRepo = new();
+  private readonly Mock<IMerchantRuleRepository> _merchantRuleRepo = new();
+  private readonly Mock<IAuditLogRepository> _auditLogRepo = new();
+
+  private CategoryService CreateSubject()
+    => new(_categoryRepo.Object, _transactionRepo.Object, _merchantRuleRepo.Object, _auditLogRepo.Object);
+
+  [Fact]
+  public async Task CreateAsync_ShouldAllowSecondLevelCategory()
+  {
+    var parent = new Category { Id = Guid.NewGuid(), Name = "Groceries", SortOrder = 1, UserId = TestUserId };
+
+    _categoryRepo.Setup(x => x.GetByIdAsync(parent.Id, TestUserId, It.IsAny<CancellationToken>()))
+      .ReturnsAsync(parent);
+    _categoryRepo.Setup(x => x.GetNextSortOrderAsync(TestUserId, parent.Id, It.IsAny<CancellationToken>()))
+      .ReturnsAsync(2);
+    _categoryRepo.Setup(x => x.GetByIdWithSubCategoriesAsync(It.IsAny<Guid>(), TestUserId, It.IsAny<CancellationToken>()))
+      .ReturnsAsync((Guid id, Guid _, CancellationToken _) => new Category
+      {
+        Id = id,
+        Name = "Organic",
+        ParentCategoryId = parent.Id,
+        SortOrder = 2,
+        UserId = TestUserId,
+        SubCategories = new List<Category>()
+      });
+
+    var service = CreateSubject();
+
+    var result = await service.CreateAsync(
+      TestUserId,
+      new CreateCategoryRequest("Organic", "#00ff00", "leaf", parent.Id),
+      CancellationToken.None);
+
+    result.Name.Should().Be("Organic");
+    result.ParentCategoryId.Should().Be(parent.Id);
+    result.IsSystem.Should().BeFalse();
+  }
+
+  [Fact]
+  public async Task CreateAsync_ShouldRejectThirdLevelCategory()
+  {
+    var parent = new Category { Id = Guid.NewGuid(), Name = "Groceries", SortOrder = 1, UserId = TestUserId };
+    var child = new Category
     {
-        using var dbContext = TestDbContextFactory.Create();
-        var parent = new Category { Name = "Groceries", SortOrder = 1, UserId = TestUserId };
-        dbContext.Categories.Add(parent);
-        await dbContext.SaveChangesAsync();
+      Id = Guid.NewGuid(),
+      Name = "Mercator",
+      ParentCategoryId = parent.Id,
+      SortOrder = 1,
+      UserId = TestUserId
+    };
 
-        var controller = CreateController(dbContext);
+    _categoryRepo.Setup(x => x.GetByIdAsync(child.Id, TestUserId, It.IsAny<CancellationToken>()))
+      .ReturnsAsync(child);
 
-        var result = await controller.CreateAsync(new CreateCategoryRequest("Organic", "#00ff00", "leaf", parent.Id), CancellationToken.None);
+    var service = CreateSubject();
 
-        var createdResult = result.Result.Should().BeOfType<CreatedResult>().Subject;
-        var category = createdResult.Value.Should().BeOfType<CategoryDto>().Subject;
-        category.Name.Should().Be("Organic");
-        category.ParentCategoryId.Should().Be(parent.Id);
-        category.IsSystem.Should().BeFalse();
-    }
+    var act = () => service.CreateAsync(
+      TestUserId,
+      new CreateCategoryRequest("Corner Shop", null, null, child.Id),
+      CancellationToken.None);
 
-    [Fact]
-    public async Task CreateAsync_ShouldRejectThirdLevelCategory()
+    await act.Should().ThrowAsync<InvalidOperationException>()
+      .WithMessage("*two category levels*");
+  }
+
+  [Fact]
+  public async Task UpdateAsync_ShouldThrowForSystemCategory()
+  {
+    var income = new Category
     {
-        using var dbContext = TestDbContextFactory.Create();
-        var parent = new Category { Name = "Groceries", SortOrder = 1, UserId = TestUserId };
-        var child = new Category { Name = "Mercator", ParentCategoryId = parent.Id, SortOrder = 1, UserId = TestUserId };
-        dbContext.Categories.AddRange(parent, child);
-        await dbContext.SaveChangesAsync();
+      Id = Guid.NewGuid(),
+      Name = "Income",
+      IsSystem = true,
+      SortOrder = 19,
+      UserId = TestUserId,
+      SubCategories = new List<Category>()
+    };
 
-        var controller = CreateController(dbContext);
+    _categoryRepo.Setup(x => x.GetByIdWithSubCategoriesAsync(income.Id, TestUserId, It.IsAny<CancellationToken>()))
+      .ReturnsAsync(income);
 
-        var result = await controller.CreateAsync(new CreateCategoryRequest("Corner Shop", null, null, child.Id), CancellationToken.None);
+    var service = CreateSubject();
 
-        result.Result.Should().BeOfType<BadRequestObjectResult>();
-    }
+    var act = () => service.UpdateAsync(
+      income.Id,
+      TestUserId,
+      new UpdateCategoryRequest("Salary", null, null, null, null, null),
+      CancellationToken.None);
 
-    [Fact]
-    public async Task UpdateAsync_ShouldForbidSystemCategory()
+    await act.Should().ThrowAsync<InvalidOperationException>()
+      .WithMessage("*System categories*");
+  }
+
+  [Fact]
+  public async Task DeleteAsync_ShouldThrowForSystemCategory()
+  {
+    var income = new Category
     {
-        using var dbContext = TestDbContextFactory.Create();
-        var income = new Category { Name = "Income", IsSystem = true, SortOrder = 19, UserId = TestUserId };
-        dbContext.Categories.Add(income);
-        await dbContext.SaveChangesAsync();
+      Id = Guid.NewGuid(),
+      Name = "Income",
+      IsSystem = true,
+      SortOrder = 19,
+      UserId = TestUserId,
+      SubCategories = new List<Category>()
+    };
 
-        var controller = CreateController(dbContext);
+    _categoryRepo.Setup(x => x.GetByIdWithSubCategoriesAsync(income.Id, TestUserId, It.IsAny<CancellationToken>()))
+      .ReturnsAsync(income);
 
-        var result = await controller.UpdateAsync(income.Id, new UpdateCategoryRequest("Salary", null, null, null, null, null), CancellationToken.None);
+    var service = CreateSubject();
 
-        result.Result.Should().BeOfType<ForbidResult>();
-    }
+    var act = () => service.DeleteAsync(
+      income.Id,
+      TestUserId,
+      new DeleteCategoryRequest(Guid.NewGuid()),
+      CancellationToken.None);
 
-    [Fact]
-    public async Task DeleteAsync_ShouldForbidSystemCategory()
-    {
-        using var dbContext = TestDbContextFactory.Create();
-        var income = new Category { Name = "Income", IsSystem = true, SortOrder = 19, UserId = TestUserId };
-        var groceries = new Category { Name = "Groceries", SortOrder = 1, UserId = TestUserId };
-        dbContext.Categories.AddRange(income, groceries);
-        await dbContext.SaveChangesAsync();
-
-        var controller = CreateController(dbContext);
-
-        var result = await controller.DeleteAsync(income.Id, new DeleteCategoryRequest(groceries.Id), CancellationToken.None);
-
-        result.Should().BeOfType<ForbidResult>();
-    }
-
-    private static CategoriesController CreateController(ExpenseTracker.Infrastructure.AppDbContext dbContext)
-        => new(dbContext, NullLogger<CategoriesController>.Instance)
-        {
-            ControllerContext = new ControllerContext
-            {
-                HttpContext = new DefaultHttpContext
-                {
-                    User = new ClaimsPrincipal(new ClaimsIdentity(
-                        new[] { new Claim(JwtRegisteredClaimNames.Sub, TestUserId.ToString()) },
-                        authenticationType: "Test"))
-                }
-            }
-        };
+    await act.Should().ThrowAsync<InvalidOperationException>()
+      .WithMessage("*System categories*");
+  }
 }

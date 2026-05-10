@@ -1,4 +1,4 @@
-using ExpenseTracker.Api.Models;
+using ExpenseTracker.Application.Models;
 using ExpenseTracker.Api.Services;
 using ExpenseTracker.Infrastructure;
 using Microsoft.AspNetCore.Hosting;

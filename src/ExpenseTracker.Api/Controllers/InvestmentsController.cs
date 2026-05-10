@@ -1,370 +1,225 @@
-using ExpenseTracker.Api.Services;
-using ExpenseTracker.Core.Entities;
-using ExpenseTracker.Core.Enums;
-using ExpenseTracker.Infrastructure;
-using ExpenseTracker.Infrastructure.Investments.Ibkr;
+using ExpenseTracker.Application.Interfaces;
+using ExpenseTracker.Application.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
-namespace ExpenseTracker.Api.Controllers
-{
-
+namespace ExpenseTracker.Api.Controllers;
 
 [Authorize]
 [Route("api/investments")]
-public sealed class InvestmentsController(
-    AppDbContext dbContext,
-    InvestmentAnalyticsService analyticsService,
-    PortfolioHistoryService historyService,
-    IbkrFlexProvider ibkrProvider,
-    IbkrPersistenceService ibkrPersistence,
-    NarrativeService narrativeService,
-    ILogger<InvestmentsController> logger) : ApiControllerBase
+public sealed class InvestmentsController(IInvestmentService investmentService) : ApiControllerBase
 {
-    [HttpGet("summary")]
-    public async Task<ActionResult<PortfolioSummaryDto>> GetSummary(CancellationToken ct)
+  [HttpGet("summary")]
+  public async Task<ActionResult<PortfolioSummaryDto>> GetSummaryAsync(CancellationToken ct)
+  {
+    var userId = GetCurrentUserId();
+    if (userId is null)
     {
-        var userId = GetCurrentUserId();
-        if (userId is null) return Unauthorized();
-        var summary = await analyticsService.GetSummaryAsync(userId.Value, ct);
-        return Ok(summary);
+      return Unauthorized();
     }
+    var result = await investmentService.GetSummaryAsync(userId.Value, ct);
+    return Ok(result);
+  }
 
-    [HttpGet("accounts")]
-    public async Task<ActionResult<List<AccountSummaryDto>>> GetAccounts(CancellationToken ct)
+  [HttpGet("accounts")]
+  public async Task<ActionResult<List<AccountSummaryDto>>> GetAccountsAsync(CancellationToken ct)
+  {
+    var userId = GetCurrentUserId();
+    if (userId is null)
     {
-        var userId = GetCurrentUserId();
-        if (userId is null) return Unauthorized();
-        var accounts = await analyticsService.GetAccountsAsync(userId.Value, ct);
-        return Ok(accounts);
+      return Unauthorized();
     }
+    var result = await investmentService.GetAccountsAsync(userId.Value, ct);
+    return Ok(result);
+  }
 
-    [HttpGet("holdings")]
-    public async Task<ActionResult<List<HoldingDto>>> GetHoldings(CancellationToken ct)
+  [HttpGet("holdings")]
+  public async Task<ActionResult<List<HoldingDto>>> GetHoldingsAsync(CancellationToken ct)
+  {
+    var userId = GetCurrentUserId();
+    if (userId is null)
     {
-        var userId = GetCurrentUserId();
-        if (userId is null) return Unauthorized();
-        var holdings = await analyticsService.GetHoldingsAsync(userId.Value, ct);
-        return Ok(holdings);
+      return Unauthorized();
     }
+    var result = await investmentService.GetHoldingsAsync(userId.Value, ct);
+    return Ok(result);
+  }
 
-    [HttpGet("allocation")]
-    public async Task<ActionResult<AllocationBreakdownDto>> GetAllocation([FromQuery] string type = "accountType", CancellationToken ct = default)
+  [HttpGet("allocation")]
+  public async Task<ActionResult<AllocationBreakdownDto>> GetAllocationAsync(
+    [FromQuery] string type = "accountType", CancellationToken ct = default)
+  {
+    var userId = GetCurrentUserId();
+    if (userId is null)
     {
-        var userId = GetCurrentUserId();
-        if (userId is null) return Unauthorized();
-        var allocation = await analyticsService.GetAllocationAsync(userId.Value, type, ct);
-        return Ok(allocation);
+      return Unauthorized();
     }
+    var result = await investmentService.GetAllocationAsync(userId.Value, type, ct);
+    return Ok(result);
+  }
 
-    [HttpGet("history")]
-    public async Task<ActionResult<List<HistoryPointDto>>> GetHistory(
-        [FromQuery] DateOnly? from = null, [FromQuery] DateOnly? to = null, CancellationToken ct = default)
+  [HttpGet("history")]
+  public async Task<ActionResult<List<HistoryPointDto>>> GetHistoryAsync(
+    [FromQuery] DateOnly? from = null, [FromQuery] DateOnly? to = null, CancellationToken ct = default)
+  {
+    var userId = GetCurrentUserId();
+    if (userId is null)
     {
-        var userId = GetCurrentUserId();
-        if (userId is null) return Unauthorized();
-        var fromDate = from ?? DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-12));
-        var toDate = to ?? DateOnly.FromDateTime(DateTime.UtcNow);
-        var history = await analyticsService.GetHistoryAsync(userId.Value, fromDate, toDate, ct);
-        return Ok(history);
+      return Unauthorized();
     }
+    var result = await investmentService.GetHistoryAsync(userId.Value, from, to, ct);
+    return Ok(result);
+  }
 
-    [HttpGet("activity")]
-    public async Task<ActionResult<List<RecentActivityDto>>> GetActivity([FromQuery] int limit = 50, CancellationToken ct = default)
+  [HttpGet("activity")]
+  public async Task<ActionResult<List<RecentActivityDto>>> GetActivityAsync(
+    [FromQuery] int limit = 50, CancellationToken ct = default)
+  {
+    var userId = GetCurrentUserId();
+    if (userId is null)
     {
-        var userId = GetCurrentUserId();
-        if (userId is null) return Unauthorized();
-        var activity = await analyticsService.GetRecentActivityAsync(userId.Value, limit, ct);
-        return Ok(activity);
+      return Unauthorized();
     }
+    var result = await investmentService.GetActivityAsync(userId.Value, limit, ct);
+    return Ok(result);
+  }
 
-    [HttpGet("dashboard-strip")]
-    public async Task<ActionResult<DashboardStripDto>> GetDashboardStrip(CancellationToken ct)
+  [HttpGet("dashboard-strip")]
+  public async Task<ActionResult<DashboardStripDto>> GetDashboardStripAsync(CancellationToken ct)
+  {
+    var userId = GetCurrentUserId();
+    if (userId is null)
     {
-        var userId = GetCurrentUserId();
-        if (userId is null) return Unauthorized();
-        var strip = await analyticsService.GetDashboardStripAsync(userId.Value, ct);
-        return Ok(strip);
+      return Unauthorized();
     }
+    var result = await investmentService.GetDashboardStripAsync(userId.Value, ct);
+    return Ok(result);
+  }
 
-    [HttpGet("narrative")]
-    public async Task<IActionResult> GetNarrative(CancellationToken ct)
+  [HttpGet("narrative")]
+  public async Task<IActionResult> GetNarrativeAsync(CancellationToken ct)
+  {
+    var userId = GetCurrentUserId();
+    if (userId is null)
     {
-        var userId = GetCurrentUserId();
-        if (userId is null) return Unauthorized();
-        var narrative = await narrativeService.GetInvestmentNarrativeAsync(userId.Value, ct);
-        return narrative is not null ? Ok(narrative) : Ok(new { content = (string?)null });
+      return Unauthorized();
     }
+    var result = await investmentService.GetNarrativeAsync(userId.Value, ct);
+    return Ok(result ?? new { content = (string?)null });
+  }
 
-    [HttpPost("sync")]
-    public async Task<IActionResult> TriggerSync(CancellationToken ct)
+  [HttpPost("sync")]
+  public async Task<IActionResult> TriggerSyncAsync(CancellationToken ct)
+  {
+    var userId = GetCurrentUserId();
+    if (userId is null)
     {
-        var userId = GetCurrentUserId();
-        if (userId is null) return Unauthorized();
-
-        var provider = await dbContext.InvestmentProviders
-            .FirstOrDefaultAsync(p => p.UserId == userId.Value && p.ProviderType == InvestmentProviderType.Ibkr && p.IsEnabled, ct);
-
-        if (provider is null)
-            return BadRequest(new { error = "IBKR provider not configured or not enabled" });
-
-        try
-        {
-            var result = await ibkrProvider.SyncAsync(provider.Id, ct);
-            await ibkrPersistence.PersistAsync(provider.Id, userId.Value, result, ct);
-
-            provider.LastSyncAt = DateTime.UtcNow;
-            provider.LastSyncStatus = "success";
-            provider.LastSyncError = null;
-            provider.UpdatedAt = DateTime.UtcNow;
-            await dbContext.SaveChangesAsync(ct);
-
-            var today = DateOnly.FromDateTime(DateTime.UtcNow);
-            await historyService.SnapshotAllAccountsForDateAsync(today, ct);
-            await narrativeService.RegenerateInvestmentNarrativeAsync(userId.Value, force: true, ct);
-
-            return Ok(new { positions = result.Positions.Count, trades = result.Trades.Count, warning = result.Warning });
-        }
-        catch (Exception ex)
-        {
-            provider.LastSyncAt = DateTime.UtcNow;
-            provider.LastSyncStatus = "failure";
-            provider.LastSyncError = ex.Message;
-            provider.UpdatedAt = DateTime.UtcNow;
-            await dbContext.SaveChangesAsync(ct);
-
-            logger.LogError(ex, "Manual IBKR sync failed");
-            return StatusCode(500, new { error = ex.Message });
-        }
+      return Unauthorized();
     }
+    var result = await investmentService.TriggerSyncAsync(userId.Value, ct);
+    return Ok(result);
+  }
 
-    [HttpGet("sync/status")]
-    public async Task<IActionResult> GetSyncStatus(CancellationToken ct)
+  [HttpGet("sync/status")]
+  public async Task<IActionResult> GetSyncStatusAsync(CancellationToken ct)
+  {
+    var userId = GetCurrentUserId();
+    if (userId is null)
     {
-        var userId = GetCurrentUserId();
-        if (userId is null) return Unauthorized();
-
-        var provider = await dbContext.InvestmentProviders
-            .AsNoTracking()
-            .FirstOrDefaultAsync(p => p.UserId == userId.Value && p.ProviderType == InvestmentProviderType.Ibkr, ct);
-
-        if (provider is null) return Ok(new { configured = false });
-
-        return Ok(new
-        {
-            configured = true,
-            enabled = provider.IsEnabled,
-            lastSyncAt = provider.LastSyncAt,
-            lastSyncStatus = provider.LastSyncStatus,
-            lastSyncError = provider.LastSyncError
-        });
+      return Unauthorized();
     }
+    var result = await investmentService.GetSyncStatusAsync(userId.Value, ct);
+    return Ok(result);
+  }
 
-    [HttpGet("manual/accounts")]
-    public async Task<ActionResult<List<ManualAccountDto>>> GetManualAccounts(CancellationToken ct)
+  [HttpGet("manual/accounts")]
+  public async Task<ActionResult<List<ManualAccountDto>>> GetManualAccountsAsync(CancellationToken ct)
+  {
+    var userId = GetCurrentUserId();
+    if (userId is null)
     {
-        var userId = GetCurrentUserId();
-        if (userId is null) return Unauthorized();
-
-        var manualProvider = await dbContext.InvestmentProviders
-            .FirstOrDefaultAsync(p => p.UserId == userId.Value && p.ProviderType == InvestmentProviderType.Manual, ct);
-        if (manualProvider is null) return Ok(new List<ManualAccountDto>());
-
-        var accounts = await dbContext.InvestmentAccounts
-            .AsNoTracking()
-            .Include(a => a.ManualBalance)
-            .Where(a => a.ProviderId == manualProvider.Id && a.UserId == userId.Value)
-            .OrderBy(a => a.SortOrder).ThenBy(a => a.DisplayName)
-            .ToListAsync(ct);
-
-        return Ok(accounts.Select(a => new ManualAccountDto(
-            Id: a.Id,
-            DisplayName: a.DisplayName,
-            AccountType: a.AccountType.ToString(),
-            Currency: a.BaseCurrency,
-            Balance: a.ManualBalance?.Balance,
-            Icon: a.Icon,
-            Color: a.Color,
-            Notes: a.Notes,
-            IsActive: a.IsActive,
-            LastUpdated: a.ManualBalance?.UpdatedAt
-        )).ToList());
+      return Unauthorized();
     }
+    var result = await investmentService.GetManualAccountsAsync(userId.Value, ct);
+    return Ok(result);
+  }
 
-    [HttpPost("manual/accounts")]
-    public async Task<IActionResult> CreateManualAccount([FromBody] CreateManualAccountRequest request, CancellationToken ct)
+  [HttpPost("manual/accounts")]
+  public async Task<IActionResult> CreateManualAccountAsync(
+    [FromBody] CreateManualAccountRequest request, CancellationToken ct)
+  {
+    var userId = GetCurrentUserId();
+    if (userId is null)
     {
-        var userId = GetCurrentUserId();
-        if (userId is null) return Unauthorized();
-
-        var manualProvider = await dbContext.InvestmentProviders
-            .FirstOrDefaultAsync(p => p.UserId == userId.Value && p.ProviderType == InvestmentProviderType.Manual, ct);
-        if (manualProvider is null) return BadRequest(new { error = "Manual provider not found" });
-
-        if (!Enum.TryParse<AccountType>(request.AccountType, true, out var accountType))
-            accountType = AccountType.Other;
-
-        var account = new InvestmentAccount
-        {
-            ProviderId = manualProvider.Id,
-            UserId = userId.Value,
-            DisplayName = request.DisplayName,
-            AccountType = accountType,
-            BaseCurrency = request.Currency ?? "EUR",
-            Icon = request.Icon ?? InvestmentAnalyticsService.DefaultIconForType(accountType),
-            Color = request.Color ?? InvestmentAnalyticsService.DefaultColorForType(accountType),
-            Notes = request.Notes,
-            IsActive = true
-        };
-        dbContext.InvestmentAccounts.Add(account);
-
-        if (request.InitialBalance.HasValue)
-        {
-            dbContext.ManualAccountBalances.Add(new ManualAccountBalance
-            {
-                AccountId = account.Id,
-                Balance = request.InitialBalance.Value,
-                Currency = request.Currency ?? "EUR",
-                UpdatedAt = DateTime.UtcNow
-            });
-
-            dbContext.ManualBalanceHistories.Add(new ManualBalanceHistory
-            {
-                AccountId = account.Id,
-                Balance = request.InitialBalance.Value,
-                Currency = request.Currency ?? "EUR",
-                RecordedAt = DateTime.UtcNow,
-                Note = "Initial balance"
-            });
-        }
-
-        await dbContext.SaveChangesAsync(ct);
-
-        if (request.InitialBalance.HasValue)
-            await historyService.SnapshotAccountAsync(account.Id, ct);
-
-        return Ok(new { id = account.Id });
+      return Unauthorized();
     }
+    var result = await investmentService.CreateManualAccountAsync(userId.Value, request, ct);
+    return Ok(result);
+  }
 
-    [HttpPatch("manual/accounts/{id:guid}")]
-    public async Task<IActionResult> UpdateManualAccount(Guid id, [FromBody] UpdateManualAccountRequest request, CancellationToken ct)
+  [HttpPatch("manual/accounts/{id:guid}")]
+  public async Task<IActionResult> UpdateManualAccountAsync(
+    Guid id, [FromBody] UpdateManualAccountRequest request, CancellationToken ct)
+  {
+    var userId = GetCurrentUserId();
+    if (userId is null)
     {
-        var userId = GetCurrentUserId();
-        if (userId is null) return Unauthorized();
-
-        var account = await dbContext.InvestmentAccounts
-            .FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId.Value, ct);
-        if (account is null) return NotFound();
-
-        if (request.DisplayName is not null) account.DisplayName = request.DisplayName;
-        if (request.AccountType is not null && Enum.TryParse<AccountType>(request.AccountType, true, out var at))
-            account.AccountType = at;
-        if (request.Icon is not null) account.Icon = request.Icon;
-        if (request.Color is not null) account.Color = request.Color;
-        if (request.Notes is not null) account.Notes = request.Notes;
-        if (request.IsActive.HasValue) account.IsActive = request.IsActive.Value;
-        account.UpdatedAt = DateTime.UtcNow;
-
-        await dbContext.SaveChangesAsync(ct);
-        return Ok();
+      return Unauthorized();
     }
-
-    [HttpDelete("manual/accounts/{id:guid}")]
-    public async Task<IActionResult> DeleteManualAccount(Guid id, CancellationToken ct)
+    var result = await investmentService.UpdateManualAccountAsync(userId.Value, id, request, ct);
+    if (!result)
     {
-        var userId = GetCurrentUserId();
-        if (userId is null) return Unauthorized();
-
-        var account = await dbContext.InvestmentAccounts
-            .FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId.Value, ct);
-        if (account is null) return NotFound();
-
-        dbContext.InvestmentAccounts.Remove(account);
-        await dbContext.SaveChangesAsync(ct);
-        return Ok();
+      return NotFound();
     }
+    return Ok();
+  }
 
-    [HttpPost("manual/accounts/{id:guid}/balance")]
-    public async Task<IActionResult> UpdateBalance(Guid id, [FromBody] UpdateBalanceRequest request, CancellationToken ct)
+  [HttpDelete("manual/accounts/{id:guid}")]
+  public async Task<IActionResult> DeleteManualAccountAsync(Guid id, CancellationToken ct)
+  {
+    var userId = GetCurrentUserId();
+    if (userId is null)
     {
-        var userId = GetCurrentUserId();
-        if (userId is null) return Unauthorized();
-
-        var account = await dbContext.InvestmentAccounts
-            .Include(a => a.ManualBalance)
-            .FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId.Value, ct);
-        if (account is null) return NotFound();
-
-        if (account.ManualBalance is null)
-        {
-            account.ManualBalance = new ManualAccountBalance
-            {
-                AccountId = id,
-                Balance = request.NewBalance,
-                Currency = account.BaseCurrency,
-                UpdatedAt = DateTime.UtcNow
-            };
-            dbContext.ManualAccountBalances.Add(account.ManualBalance);
-        }
-        else
-        {
-            account.ManualBalance.Balance = request.NewBalance;
-            account.ManualBalance.UpdatedAt = DateTime.UtcNow;
-        }
-
-        dbContext.ManualBalanceHistories.Add(new ManualBalanceHistory
-        {
-            AccountId = id,
-            Balance = request.NewBalance,
-            Currency = account.BaseCurrency,
-            RecordedAt = DateTime.UtcNow,
-            Note = request.Note
-        });
-
-        await dbContext.SaveChangesAsync(ct);
-
-        await historyService.SnapshotAccountAsync(id, ct);
-        await narrativeService.RegenerateInvestmentNarrativeAsync(userId.Value, force: true, ct);
-
-        return Ok(new { balance = request.NewBalance });
+      return Unauthorized();
     }
-
-    [HttpGet("manual/accounts/{id:guid}/history")]
-    public async Task<IActionResult> GetBalanceHistory(Guid id, CancellationToken ct)
+    var result = await investmentService.DeleteManualAccountAsync(userId.Value, id, ct);
+    if (!result)
     {
-        var userId = GetCurrentUserId();
-        if (userId is null) return Unauthorized();
-
-        var account = await dbContext.InvestmentAccounts
-            .AsNoTracking()
-            .FirstOrDefaultAsync(a => a.Id == id && a.UserId == userId.Value, ct);
-        if (account is null) return NotFound();
-
-        var history = await dbContext.ManualBalanceHistories
-            .AsNoTracking()
-            .Where(h => h.AccountId == id)
-            .OrderByDescending(h => h.RecordedAt)
-            .Select(h => new { h.Balance, h.Currency, h.RecordedAt, h.Note })
-            .ToListAsync(ct);
-
-        return Ok(history);
+      return NotFound();
     }
-}
+    return Ok();
+  }
 
-public record ManualAccountDto(
-    Guid Id, string DisplayName, string AccountType, string Currency,
-    decimal? Balance, string? Icon, string? Color, string? Notes,
-    bool IsActive, DateTime? LastUpdated);
+  [HttpPost("manual/accounts/{id:guid}/balance")]
+  public async Task<IActionResult> UpdateBalanceAsync(
+    Guid id, [FromBody] UpdateBalanceRequest request, CancellationToken ct)
+  {
+    var userId = GetCurrentUserId();
+    if (userId is null)
+    {
+      return Unauthorized();
+    }
+    var result = await investmentService.UpdateBalanceAsync(userId.Value, id, request, ct);
+    if (result is null)
+    {
+      return NotFound();
+    }
+    return Ok(result);
+  }
 
-public record CreateManualAccountRequest(
-    string DisplayName, string AccountType, string? Currency,
-    decimal? InitialBalance, string? Icon, string? Color, string? Notes);
-
-public record UpdateManualAccountRequest(
-    string? DisplayName, string? AccountType, string? Icon,
-    string? Color, string? Notes, bool? IsActive);
-
-public record UpdateBalanceRequest(decimal NewBalance, string? Note);
-
+  [HttpGet("manual/accounts/{id:guid}/history")]
+  public async Task<IActionResult> GetBalanceHistoryAsync(Guid id, CancellationToken ct)
+  {
+    var userId = GetCurrentUserId();
+    if (userId is null)
+    {
+      return Unauthorized();
+    }
+    var result = await investmentService.GetBalanceHistoryAsync(userId.Value, id, ct);
+    if (result is null)
+    {
+      return NotFound();
+    }
+    return Ok(result);
+  }
 }

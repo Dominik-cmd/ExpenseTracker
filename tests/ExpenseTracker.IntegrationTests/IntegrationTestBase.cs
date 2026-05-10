@@ -1,5 +1,5 @@
 using System.Net.Http.Json;
-using ExpenseTracker.Api.Models;
+using ExpenseTracker.Application.Models;
 using ExpenseTracker.Core.Entities;
 using ExpenseTracker.Core.Enums;
 using ExpenseTracker.Infrastructure;

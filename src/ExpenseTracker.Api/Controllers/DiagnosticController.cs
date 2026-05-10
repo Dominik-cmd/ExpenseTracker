@@ -1,30 +1,23 @@
-using ExpenseTracker.Api.Models;
-using ExpenseTracker.Infrastructure;
+using ExpenseTracker.Application.Interfaces;
+using ExpenseTracker.Application.Models;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
-namespace ExpenseTracker.Api.Controllers
-{
+namespace ExpenseTracker.Api.Controllers;
 
-
+[Authorize]
 [Route("api/diagnostic")]
-public sealed class DiagnosticController(OtpBankaSmsParser parser, ILogger<DiagnosticController> logger) : ApiControllerBase
+public sealed class DiagnosticController(IDiagnosticService diagnosticService) : ApiControllerBase
 {
-    [HttpPost("parse-sms")]
-    public ActionResult<DiagnosticParseResponse> ParseSms([FromBody] DiagnosticParseRequest request)
+  [HttpPost("parse-sms")]
+  public ActionResult<DiagnosticParseResponse> ParseSms(
+    [FromBody] DiagnosticParseRequest request)
+  {
+    var result = diagnosticService.ParseSms(request.Text);
+    if (!result.Success)
     {
-        try
-        {
-            var parsed = parser.Parse(request.Text);
-            return parsed is null
-                ? BadRequest(new DiagnosticParseResponse(false, null, "Unable to parse SMS payload."))
-                : Ok(new DiagnosticParseResponse(true, parsed, null));
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Diagnostic SMS parsing failed.");
-            return Problem(statusCode: StatusCodes.Status500InternalServerError, title: "Unable to parse SMS payload.");
-        }
+      return BadRequest(result);
     }
+    return Ok(result);
+  }
 }
-}
-

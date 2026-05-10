@@ -1,6 +1,6 @@
 using System.Net;
 using System.Text.Json;
-using ExpenseTracker.Api.Models;
+using ExpenseTracker.Application.Models;
 using ExpenseTracker.Api.Services;
 using ExpenseTracker.Core.Entities;
 using ExpenseTracker.Core.Enums;

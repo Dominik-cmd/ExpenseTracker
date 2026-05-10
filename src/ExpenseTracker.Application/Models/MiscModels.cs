@@ -1,35 +1,18 @@
-using System;
-using System.Collections.Generic;
 using ExpenseTracker.Core.Enums;
 using ExpenseTracker.Core.Records;
 
-namespace ExpenseTracker.Api.Models
-{
-
-
-public sealed record MerchantRuleDto(
-    Guid Id,
-    string MerchantNormalized,
-    Guid CategoryId,
-    string CategoryName,
-    string? ParentCategoryName,
-    string CreatedBy,
-    int HitCount,
-    DateTime? LastHitAt,
-    DateTime CreatedAt);
-
-public sealed record UpdateMerchantRuleRequest(Guid CategoryId, bool ApplyToExistingTransactions = false);
+namespace ExpenseTracker.Application.Models;
 
 public sealed record RawMessageDto(
-    Guid Id,
-    string Sender,
-    string Body,
-    DateTime ReceivedAt,
-    ParseStatus ParseStatus,
-    string? ErrorMessage,
-    string IdempotencyHash,
-    Guid? TransactionId,
-    DateTime CreatedAt);
+  Guid Id,
+  string Sender,
+  string Body,
+  DateTime ReceivedAt,
+  ParseStatus ParseStatus,
+  string? ErrorMessage,
+  string IdempotencyHash,
+  Guid? TransactionId,
+  DateTime CreatedAt);
 
 public sealed record UpdateSmsSendersRequest(List<string> Senders);
 
@@ -42,5 +25,7 @@ public sealed record QueuedItemDto(Guid Id, string Preview, DateTime CreatedAt);
 public sealed record RecentItemDto(Guid Id, string Preview, string Status, string? FailureReason, DateTime ProcessedAt);
 
 public sealed record QueueStatusDto(int PendingCount, List<QueuedItemDto> Pending, List<RecentItemDto> RecentlyProcessed);
-}
 
+public sealed record WebhookSmsRequest(string From, string Text, string? SentStamp);
+
+public sealed record WebhookSmsResponse(string Status);

@@ -1,10 +1,6 @@
-namespace ExpenseTracker.Api.Middleware
-{
-
+namespace ExpenseTracker.Api.Middleware;
 
 public static class RateLimitingMiddleware
 {
-    public const string LoginPolicyName = "auth-login";
+  public const string LoginPolicyName = "auth-login";
 }
-}
-

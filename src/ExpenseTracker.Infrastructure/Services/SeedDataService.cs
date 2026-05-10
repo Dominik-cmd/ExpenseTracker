@@ -8,7 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace ExpenseTracker.Infrastructure;
 
-public sealed class SeedDataService : IHostedService
+public sealed class SeedDataService : IHostedService, ExpenseTracker.Application.Interfaces.ISeedDataService
 {
     private const string DefaultInitialPassword = "ChangeMeNow!";
 
@@ -57,7 +57,15 @@ public sealed class SeedDataService : IHostedService
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
-    /// <summary>Seeds default categories, LLM providers, and settings for a specific user.</summary>
+    public async Task SeedForUserAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var user = await _dbContext.Users.FindAsync([userId], cancellationToken);
+        if (user is not null)
+        {
+            await SeedForUserAsync(user, cancellationToken);
+        }
+    }
+
     public async Task SeedForUserAsync(User user, CancellationToken cancellationToken = default)
     {
         await SeedCategoriesAsync(user.Id, cancellationToken);
