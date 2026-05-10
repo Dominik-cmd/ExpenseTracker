@@ -5,14 +5,28 @@ namespace ExpenseTracker.Infrastructure.Investments.Ibkr;
 
 public sealed class IbkrFlexClient(IHttpClientFactory httpClientFactory, ILogger<IbkrFlexClient> logger)
 {
-    private const string BaseUrl = "https://gdcdyn.interactivebrokers.com/Universal/servlet/FlexStatementService";
+    private const string BaseUrl = "https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService";
 
     public async Task<string> RequestAndFetchReportAsync(string token, string queryId, CancellationToken ct)
     {
         var http = httpClientFactory.CreateClient("IbkrFlex");
 
-        var requestUrl = $"{BaseUrl}.SendRequest?t={Uri.EscapeDataString(token)}&q={Uri.EscapeDataString(queryId)}&v=3";
-        var requestResponse = await http.GetStringAsync(requestUrl, ct);
+        var requestUrl = $"{BaseUrl}/SendRequest?t={Uri.EscapeDataString(token)}&q={Uri.EscapeDataString(queryId)}&v=3";
+
+        const int maxSendAttempts = 5;
+        var sendDelay = TimeSpan.FromSeconds(3);
+        string requestResponse = "";
+        for (var sendAttempt = 0; sendAttempt < maxSendAttempts; sendAttempt++)
+        {
+            requestResponse = await http.GetStringAsync(requestUrl, ct);
+            if (!IsTransientSendError(requestResponse))
+                break;
+
+            logger.LogWarning("IBKR Flex SendRequest returned transient error (attempt {Attempt}/{Max}), retrying in {Delay}s",
+                sendAttempt + 1, maxSendAttempts, sendDelay.TotalSeconds);
+            await Task.Delay(sendDelay, ct);
+        }
+
         var (referenceCode, retrievalUrl) = ParseSendRequestResponse(requestResponse);
 
         var maxAttempts = 10;
@@ -55,6 +69,25 @@ public sealed class IbkrFlexClient(IHttpClientFactory httpClientFactory, ILogger
             ?? throw new InvalidOperationException("IBKR response missing Url");
 
         return (referenceCode, url);
+    }
+
+    private static bool IsTransientSendError(string response)
+    {
+        if (!response.TrimStart().StartsWith("<"))
+            return false;
+
+        try
+        {
+            var doc = XDocument.Parse(response);
+            var status = doc.Root?.Element("Status")?.Value;
+            var errorCode = doc.Root?.Element("ErrorCode")?.Value;
+            // 1001 = "Statement could not be generated at this time. Please try again shortly."
+            return status != "Success" && errorCode == "1001";
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static bool IsStillGenerating(string response)
