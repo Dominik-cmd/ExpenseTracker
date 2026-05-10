@@ -35,7 +35,7 @@ const DASHBOARD_FALLBACK: DashboardAnalytics = {
   imports: [CommonModule, CardModule, NgxEchartsDirective, RouterLink],
   template: `
     <div class="dashboard-root">
-      <div class="widget-card summary-card">
+      <p-card>
         <div class="strip-numbers">
           <span class="strip-item">
             <span class="strip-label">This month</span>
@@ -60,69 +60,73 @@ const DASHBOARD_FALLBACK: DashboardAnalytics = {
         @if (narrative()?.isStale) {
           <div class="narrative-stale">updating...</div>
         }
-      </div>
+      </p-card>
 
       <div class="main-grid">
-        <div class="widget-card flex-card">
-          <div class="widget-header">
-            <span class="widget-title">Recent transactions</span>
-            <a class="see-all-link" routerLink="/transactions">See all →</a>
-          </div>
-          @if ((analytics()?.recentTransactions?.length ?? 0) > 0) {
-            <div class="txn-list">
-              @for (t of (analytics()?.recentTransactions ?? []).slice(0, 8); track t.id) {
-                <div class="txn-row">
-                  <span class="txn-dot" [style.background]="getCategoryColor(t)"></span>
-                  <span class="txn-date">{{ t.transactionDate | date:'dd MMM' }}</span>
-                  <span class="txn-merchant">{{ (t.merchantNormalized || t.merchantRaw || 'Manual entry') | slice:0:28 }}</span>
-                  <span class="txn-amount" [class.text-positive]="t.direction === 'Credit'" [class.text-negative]="t.direction !== 'Credit'">
-                    {{ t.direction === 'Credit' ? '+' : '−' }}{{ abs(t.amount) | currency:'EUR':'symbol':'1.2-2' }}
-                  </span>
-                </div>
-              }
+        <div class="fill-card-wrapper">
+          <p-card>
+            <div class="widget-header">
+              <span class="widget-title">Recent transactions</span>
+              <a class="see-all-link" routerLink="/transactions">See all →</a>
             </div>
-          } @else {
-            <div class="empty-state">No transactions yet. Send a test SMS to verify the webhook.</div>
-          }
+            @if ((analytics()?.recentTransactions?.length ?? 0) > 0) {
+              <div class="txn-list">
+                @for (t of (analytics()?.recentTransactions ?? []).slice(0, 10); track t.id) {
+                  <div class="txn-row">
+                    <span class="txn-dot" [style.background]="getCategoryColor(t)"></span>
+                    <span class="txn-date">{{ t.transactionDate | date:'dd MMM' }}</span>
+                    <span class="txn-merchant">{{ (t.merchantNormalized || t.merchantRaw || 'Manual entry') | slice:0:28 }}</span>
+                    <span class="txn-amount" [class.text-positive]="t.direction === 'Credit'" [class.text-negative]="t.direction !== 'Credit'">
+                      {{ t.direction === 'Credit' ? '+' : '−' }}{{ abs(t.amount) | currency:'EUR':'symbol':'1.2-2' }}
+                    </span>
+                  </div>
+                }
+              </div>
+            } @else {
+              <div class="empty-state">No transactions yet. Send a test SMS to verify the webhook.</div>
+            }
+          </p-card>
         </div>
 
-        <div class="widget-card flex-card">
-          <div class="widget-header">
-            <div>
-              <div class="widget-title">Spending this month</div>
-              <div class="widget-subtitle">Top 8 categories</div>
+        <div class="fill-card-wrapper">
+          <p-card>
+            <div class="widget-header">
+              <div>
+                <div class="widget-title">Spending this month</div>
+                <div class="widget-subtitle">Top 8 categories</div>
+              </div>
+              <span class="leaderboard-total">{{ leaderboardTotal() | currency:'EUR':'symbol':'1.0-0' }}</span>
             </div>
-            <span class="leaderboard-total">{{ leaderboardTotal() | currency:'EUR':'symbol':'1.0-0' }}</span>
-          </div>
-          @if (leaderboard().length > 0) {
-            <div class="leaderboard-list">
-              @for (item of leaderboard(); track item.name) {
-                <div class="leaderboard-row">
-                  <div class="lb-top-line">
-                    <span class="lb-dot" [style.background]="item.color || '#94a3b8'"></span>
-                    <span class="lb-name">{{ item.name }}</span>
-                    <span class="lb-amount">{{ item.amount >= 100 ? (item.amount | currency:'EUR':'symbol':'1.0-0') : (item.amount | currency:'EUR':'symbol':'1.2-2') }}</span>
-                    <span class="lb-pct">{{ item.percentage.toFixed(1) }}%</span>
+            @if (leaderboard().length > 0) {
+              <div class="leaderboard-list">
+                @for (item of leaderboard(); track item.name) {
+                  <div class="leaderboard-row">
+                    <div class="lb-top-line">
+                      <span class="lb-dot" [style.background]="item.color || '#94a3b8'"></span>
+                      <span class="lb-name">{{ item.name }}</span>
+                      <span class="lb-amount">{{ item.amount >= 100 ? (item.amount | currency:'EUR':'symbol':'1.0-0') : (item.amount | currency:'EUR':'symbol':'1.2-2') }}</span>
+                      <span class="lb-pct">{{ item.percentage.toFixed(1) }}%</span>
+                    </div>
+                    <div class="lb-bar-track">
+                      <div class="lb-bar-fill" [style.width.%]="(item.amount / leaderboardMax()) * 100" [style.background]="barColor(item.color)"></div>
+                    </div>
                   </div>
-                  <div class="lb-bar-track">
-                    <div class="lb-bar-fill" [style.width.%]="(item.amount / leaderboardMax()) * 100" [style.background]="barColor(item.color)"></div>
-                  </div>
-                </div>
-              }
-            </div>
-          } @else {
-            <div class="empty-state">No spending recorded yet this month.</div>
-          }
+                }
+              </div>
+            } @else {
+              <div class="empty-state">No spending recorded yet this month.</div>
+            }
+          </p-card>
         </div>
       </div>
 
-      <div class="widget-card">
+      <p-card>
         <div class="widget-header">
           <span class="widget-title">Income vs Spending</span>
           <span class="widget-subtitle">Last 6 months</span>
         </div>
         <div echarts [options]="incomeVsSpendingOptions()" class="income-chart"></div>
-      </div>
+      </p-card>
     </div>
   `,
   styles: [`
@@ -130,10 +134,6 @@ const DASHBOARD_FALLBACK: DashboardAnalytics = {
       display: flex;
       flex-direction: column;
       gap: 1.25rem;
-    }
-
-    .summary-card {
-      /* inherits widget-card box; just stacks vertically */
     }
 
     .strip-numbers {
@@ -189,21 +189,32 @@ const DASHBOARD_FALLBACK: DashboardAnalytics = {
     }
 
     @media (max-width: 768px) {
-      .main-grid {
-        grid-template-columns: 1fr;
-      }
+      .main-grid { grid-template-columns: 1fr; }
     }
 
-    .widget-card {
-      background: var(--surface-card);
-      border: 1px solid var(--surface-border);
-      border-radius: 12px;
-      padding: 1.25rem 1.5rem;
-    }
-
-    .flex-card {
+    /* Make side-by-side p-cards fill full grid row height */
+    .fill-card-wrapper {
       display: flex;
       flex-direction: column;
+    }
+
+    .fill-card-wrapper ::ng-deep .p-card {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .fill-card-wrapper ::ng-deep .p-card-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .fill-card-wrapper ::ng-deep .p-card-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      padding-top: 0;
     }
 
     .widget-header {
@@ -232,9 +243,7 @@ const DASHBOARD_FALLBACK: DashboardAnalytics = {
       white-space: nowrap;
     }
 
-    .see-all-link:hover {
-      text-decoration: underline;
-    }
+    .see-all-link:hover { text-decoration: underline; }
 
     .leaderboard-total {
       font-size: 1rem;
@@ -246,7 +255,6 @@ const DASHBOARD_FALLBACK: DashboardAnalytics = {
       flex: 1;
       display: flex;
       flex-direction: column;
-      gap: 0;
     }
 
     .txn-row {
@@ -258,9 +266,7 @@ const DASHBOARD_FALLBACK: DashboardAnalytics = {
       border-bottom: 1px solid var(--surface-border);
     }
 
-    .txn-row:last-child {
-      border-bottom: none;
-    }
+    .txn-row:last-child { border-bottom: none; }
 
     .txn-dot {
       width: 9px;
@@ -360,13 +366,8 @@ const DASHBOARD_FALLBACK: DashboardAnalytics = {
       height: 20rem;
     }
 
-    .text-positive {
-      color: #10b981;
-    }
-
-    .text-negative {
-      color: #ef4444;
-    }
+    .text-positive { color: #10b981; }
+    .text-negative { color: #ef4444; }
 
     .empty-state {
       padding: 1.5rem 0;
