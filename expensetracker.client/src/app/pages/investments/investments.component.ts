@@ -10,6 +10,7 @@ import { InputNumberModule } from 'primeng/inputnumber';
 import { InputTextModule } from 'primeng/inputtext';
 import { SelectModule } from 'primeng/select';
 import { TagModule } from 'primeng/tag';
+import { ConfirmationService } from 'primeng/api';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { EChartsOption } from 'echarts';
 
@@ -221,7 +222,9 @@ const HISTORY_RANGES = [
                 @if (daysSince(account.lastUpdated) > 30) { <i class="pi pi-exclamation-triangle"></i> }
               </span>
             }
-            <p-button label="Update" icon="pi pi-pencil" [text]="true" size="small" (onClick)="openUpdateBalanceDialog(account)" />
+            <p-button label="Balance" icon="pi pi-wallet" [text]="true" size="small" (onClick)="openUpdateBalanceDialog(account)" />
+            <p-button icon="pi pi-pencil" [text]="true" size="small" severity="secondary" (onClick)="openEditAccountDialog(account)" />
+            <p-button icon="pi pi-trash" [text]="true" size="small" severity="danger" (onClick)="confirmDeleteAccount(account)" />
           </div>
         }
         @if (manualAccounts().length === 0) {
@@ -249,6 +252,28 @@ const HISTORY_RANGES = [
         <ng-template #footer>
           <p-button label="Cancel" [text]="true" (onClick)="showUpdateDialog.set(false)" />
           <p-button label="Save" icon="pi pi-check" (onClick)="saveBalance()" [loading]="saving()" />
+        </ng-template>
+      </p-dialog>
+
+      <p-dialog
+        [header]="'Edit ' + (selectedAccount()?.displayName ?? '')"
+        [visible]="showEditDialog()"
+        (visibleChange)="showEditDialog.set($event)"
+        [modal]="true"
+        [style]="{ width: '400px' }">
+        <div class="dialog-form">
+          <div class="field">
+            <label>Display name</label>
+            <input pInputText [(ngModel)]="editAccountName" placeholder="e.g., NLB Savings" />
+          </div>
+          <div class="field">
+            <label>Account type</label>
+            <p-select [(ngModel)]="editAccountType" [options]="accountTypes" optionLabel="label" optionValue="value" />
+          </div>
+        </div>
+        <ng-template #footer>
+          <p-button label="Cancel" [text]="true" (onClick)="showEditDialog.set(false)" />
+          <p-button label="Save" icon="pi pi-check" (onClick)="saveEditAccount()" [loading]="saving()" />
         </ng-template>
       </p-dialog>
 
@@ -352,6 +377,7 @@ const HISTORY_RANGES = [
 export class InvestmentsComponent {
   private readonly api = inject(ApiService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly confirmationService = inject(ConfirmationService);
 
   protected readonly accountTypes = ACCOUNT_TYPES;
   protected readonly allocationTypes = ALLOCATION_TYPES;
@@ -381,6 +407,7 @@ export class InvestmentsComponent {
 
   protected readonly showUpdateDialog = signal(false);
   protected readonly showAddDialog = signal(false);
+  protected readonly showEditDialog = signal(false);
   protected readonly selectedAccount = signal<ManualAccount | null>(null);
   protected readonly saving = signal(false);
   protected newBalance: number | null = null;
@@ -390,6 +417,8 @@ export class InvestmentsComponent {
   protected newAccountCurrency = 'EUR';
   protected newAccountBalance: number | null = null;
   protected newAccountNotes = '';
+  protected editAccountName = '';
+  protected editAccountType = 'Savings';
 
   protected readonly chartOptions = computed<EChartsOption>(() => {
     const data = this.history();
@@ -542,6 +571,46 @@ export class InvestmentsComponent {
         this.loadData();
       },
       error: () => this.saving.set(false)
+    });
+  }
+
+  protected openEditAccountDialog(account: ManualAccount): void {
+    this.selectedAccount.set(account);
+    this.editAccountName = account.displayName;
+    this.editAccountType = account.accountType;
+    this.showEditDialog.set(true);
+  }
+
+  protected saveEditAccount(): void {
+    const account = this.selectedAccount();
+    if (!account || !this.editAccountName) return;
+
+    this.saving.set(true);
+    this.api.updateManualAccount(account.id, {
+      displayName: this.editAccountName,
+      accountType: this.editAccountType
+    }).pipe(takeUntilDestroyed(this.destroyRef)).subscribe({
+      next: () => {
+        this.showEditDialog.set(false);
+        this.saving.set(false);
+        this.loadData();
+      },
+      error: () => this.saving.set(false)
+    });
+  }
+
+  protected confirmDeleteAccount(account: ManualAccount): void {
+    this.confirmationService.confirm({
+      message: `Delete "${account.displayName}"? This will remove all its balance history.`,
+      header: 'Delete account',
+      icon: 'pi pi-exclamation-triangle',
+      acceptLabel: 'Delete',
+      rejectLabel: 'Cancel',
+      accept: () => {
+        this.api.deleteManualAccount(account.id)
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe({ next: () => this.loadData() });
+      }
     });
   }
 }

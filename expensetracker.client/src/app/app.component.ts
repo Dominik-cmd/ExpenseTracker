@@ -1,11 +1,12 @@
 import { CommonModule, DOCUMENT, NgClass } from '@angular/common';
-import { Component, computed, effect, inject, signal } from '@angular/core';
+import { Component, HostListener, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
+import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ToastModule } from 'primeng/toast';
 import { ToggleSwitchModule } from 'primeng/toggleswitch';
+import { filter } from 'rxjs';
 
 import { AuthService } from './core/services/auth.service';
 
@@ -91,6 +92,7 @@ const NAV_GROUPS: NavGroup[] = [
 export class AppComponent {
   private readonly authService = inject(AuthService);
   private readonly document = inject(DOCUMENT);
+  private readonly router = inject(Router);
 
   protected readonly navGroups = computed(() => {
     const isAdmin = this.authService.isAdmin();
@@ -104,9 +106,11 @@ export class AppComponent {
   });
   protected readonly darkMode = signal(this.readDarkModePreference());
   protected readonly sidebarCollapsed = signal(this.readSidebarPreference());
+  protected readonly mobileSidebarOpen = signal(false);
   protected readonly expandedSections = signal<Set<string>>(this.readSectionPreferences());
   protected readonly isAuthenticated = this.authService.authenticated;
   protected readonly username = computed(() => this.authService.getUsername() ?? 'Expense user');
+  protected readonly isMobile = signal(this.checkMobile());
 
   constructor() {
     effect(() => {
@@ -124,10 +128,33 @@ export class AppComponent {
       const sections = this.expandedSections();
       localStorage.setItem(SIDEBAR_SECTIONS_KEY, JSON.stringify([...sections]));
     });
+
+    // Close mobile sidebar on navigation
+    this.router.events.pipe(filter(e => e instanceof NavigationEnd)).subscribe(() => {
+      if (this.isMobile()) {
+        this.mobileSidebarOpen.set(false);
+      }
+    });
+  }
+
+  @HostListener('window:resize')
+  onResize(): void {
+    this.isMobile.set(this.checkMobile());
+    if (!this.isMobile()) {
+      this.mobileSidebarOpen.set(false);
+    }
   }
 
   protected toggleSidebar(): void {
-    this.sidebarCollapsed.update((v) => !v);
+    if (this.isMobile()) {
+      this.mobileSidebarOpen.update(v => !v);
+    } else {
+      this.sidebarCollapsed.update((v) => !v);
+    }
+  }
+
+  protected closeMobileSidebar(): void {
+    this.mobileSidebarOpen.set(false);
   }
 
   protected toggleSection(label: string): void {
@@ -166,6 +193,10 @@ export class AppComponent {
   private readSidebarPreference(): boolean {
     const stored = localStorage.getItem(SIDEBAR_KEY);
     return stored === 'true'; // open by default (collapsed = false)
+  }
+
+  private checkMobile(): boolean {
+    return typeof window !== 'undefined' && window.innerWidth < 768;
   }
 
   private readSectionPreferences(): Set<string> {

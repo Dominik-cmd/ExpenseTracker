@@ -174,6 +174,12 @@ public sealed class InvestmentAnalyticsService(AppDbContext dbContext)
             {
                 foreach (var holding in account.Holdings)
                 {
+                    // Skip CASH positions in currency breakdown — they're residual/operational
+                    // cash (e.g. USD dividends) and confuse the allocation picture.
+                    if (allocationType.Equals("currency", StringComparison.OrdinalIgnoreCase)
+                        && holding.Instrument.AssetClass.Equals("CASH", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
                     var key = allocationType.ToLowerInvariant() switch
                     {
                         "assetclass" => holding.Instrument.AssetClass,

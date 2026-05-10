@@ -196,28 +196,64 @@
 @media (max-width: 768px) {
   .app-sidebar {
     width: 260px;
-    transform: translateX(0);
+    transform: translateX(-260px);
     transition: transform 0.25s ease;
   }
 
+  .mobile-sidebar-open .app-sidebar {
+    transform: translateX(0);
+  }
+
+  /* On mobile the desktop collapsed state has no effect on width/position */
   .sidebar-collapsed .app-sidebar {
     width: 260px;
     transform: translateX(-260px);
   }
 
-  .has-sidebar .app-main {
-    margin-left: 0;
+  .mobile-sidebar-open.sidebar-collapsed .app-sidebar {
+    transform: translateX(0);
   }
 
+  .has-sidebar .app-main,
   .has-sidebar.sidebar-collapsed .app-main {
     margin-left: 0;
   }
 
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 29;
+    cursor: pointer;
+  }
+
+  .mobile-menu-btn {
+    display: inline-flex !important;
+  }
+
   .app-topbar {
-    padding: 1rem;
+    padding: 0.75rem 1rem;
   }
 
   .app-content {
     padding: 1rem;
+  }
+
+  .app-title {
+    font-size: 1.1rem;
+  }
+
+  .app-subtitle {
+    display: none;
+  }
+}
+
+@media (min-width: 769px) {
+  .mobile-menu-btn {
+    display: none !important;
+  }
+
+  .sidebar-backdrop {
+    display: none;
   }
 }

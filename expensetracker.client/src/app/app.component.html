@@ -1,4 +1,11 @@
-<div class="app-shell" [class.has-sidebar]="isAuthenticated()" [class.sidebar-collapsed]="sidebarCollapsed()">
+<div class="app-shell"
+     [class.has-sidebar]="isAuthenticated()"
+     [class.sidebar-collapsed]="sidebarCollapsed()"
+     [class.mobile-sidebar-open]="mobileSidebarOpen()">
+
+  <!-- Mobile backdrop -->
+  <div class="sidebar-backdrop" *ngIf="isAuthenticated() && mobileSidebarOpen()" (click)="closeMobileSidebar()"></div>
+
   <!-- Persistent sidebar -->
   <aside class="app-sidebar" *ngIf="isAuthenticated()">
     <div class="sidebar-header">
@@ -53,6 +60,13 @@
   <div class="app-main">
     <header class="app-topbar">
       <div class="topbar-left">
+        <p-button
+          *ngIf="isAuthenticated()"
+          class="mobile-menu-btn"
+          icon="pi pi-bars"
+          [text]="true"
+          severity="secondary"
+          (onClick)="toggleSidebar()"></p-button>
         <div>
           <div class="app-title">Expense Tracker</div>
           <div class="app-subtitle">

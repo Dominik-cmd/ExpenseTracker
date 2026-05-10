@@ -18,8 +18,11 @@ public sealed class IbkrFlexParser
             Quantity: DecAttr(e, "position"),
             CostBasisPerShare: DecAttr(e, "costBasisPrice"),
             MarkPrice: DecAttr(e, "markPrice"),
-            MarketValue: DecAttr(e, "positionValue", DecAttr(e, "markPrice") * DecAttr(e, "position")),
-            UnrealizedPnl: DecAttr(e, "fifoPnlUnrealized"),
+            // Prefer positionValueInBase (already converted to account base currency by IBKR)
+            // so USD positions are stored as their EUR equivalent, not face USD value.
+            MarketValue: DecAttrPreferBase(e, "positionValueInBase", "positionValue",
+                DecAttr(e, "markPrice") * DecAttr(e, "position")),
+            UnrealizedPnl: DecAttrPreferBase(e, "fifoPnlUnrealizedInBase", "fifoPnlUnrealized"),
             UnrealizedPnlPercent: ComputePnlPercent(e),
             AccountId: Attr(e, "accountId")
         )).ToList();
@@ -78,6 +81,18 @@ public sealed class IbkrFlexParser
     {
         var val = e.Attribute(name)?.Value;
         return val is not null && decimal.TryParse(val, NumberStyles.Any, CultureInfo.InvariantCulture, out var result) ? result : fallback;
+    }
+
+    /// <summary>
+    /// Returns the base-currency attribute value when non-zero, otherwise falls back to the
+    /// native-currency attribute, and finally to the provided fallback.
+    /// IBKR Flex reports include both e.g. positionValue (USD) and positionValueInBase (EUR).
+    /// </summary>
+    private static decimal DecAttrPreferBase(XElement e, string baseName, string nativeName, decimal fallback = 0)
+    {
+        var baseVal = DecAttr(e, baseName);
+        if (baseVal != 0) return baseVal;
+        return DecAttr(e, nativeName, fallback);
     }
 
     private static decimal ComputePnlPercent(XElement e)
