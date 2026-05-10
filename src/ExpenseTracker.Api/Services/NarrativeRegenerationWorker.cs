@@ -31,13 +31,13 @@ public sealed class NarrativeRegenerationWorker(
                 switch (request.Type)
                 {
                     case "dashboard":
-                        await narrativeService.RegenerateDashboardNarrativeAsync(request.UserId, stoppingToken);
+                        await narrativeService.RegenerateDashboardNarrativeAsync(request.UserId, force: false, stoppingToken);
                         break;
                     case "monthly" when request.Year.HasValue && request.Month.HasValue:
-                        await narrativeService.RegenerateMonthlyNarrativeAsync(request.UserId, request.Year.Value, request.Month.Value, stoppingToken);
+                        await narrativeService.RegenerateMonthlyNarrativeAsync(request.UserId, request.Year.Value, request.Month.Value, force: false, stoppingToken);
                         break;
                     case "yearly" when request.Year.HasValue:
-                        await narrativeService.RegenerateYearlyNarrativeAsync(request.UserId, request.Year.Value, stoppingToken);
+                        await narrativeService.RegenerateYearlyNarrativeAsync(request.UserId, request.Year.Value, force: false, stoppingToken);
                         break;
                 }
             }

@@ -52,63 +52,51 @@ public sealed class NarrativeService(
         return cached is null ? null : new NarrativeResponse(cached.Content, cached.GeneratedAt, cached.ModelUsed, false);
     }
 
-    public async Task RegenerateDashboardNarrativeAsync(Guid userId, CancellationToken ct)
+    public async Task RegenerateDashboardNarrativeAsync(Guid userId, bool force, CancellationToken ct)
     {
         var input = await BuildDashboardInputAsync(userId, ct);
-        if (input is null)
-        {
-            return;
-        }
-
-        await GenerateAndStoreAsync(userId, "dashboard", "current", input, BuildDashboardPrompt(input), ct);
+        if (input is null) return;
+        await GenerateAndStoreAsync(userId, "dashboard", "current", input, BuildDashboardPrompt(input), force, ct);
     }
 
-    public async Task RegenerateMonthlyNarrativeAsync(Guid userId, int year, int month, CancellationToken ct)
+    public async Task RegenerateMonthlyNarrativeAsync(Guid userId, int year, int month, bool force, CancellationToken ct)
     {
         var input = await BuildMonthlyInputAsync(userId, year, month, ct);
-        if (input is null)
-        {
-            return;
-        }
-
-        await GenerateAndStoreAsync(userId, "monthly", $"{year}-{month:D2}", input, BuildMonthlyPrompt(input, year, month), ct);
+        if (input is null) return;
+        await GenerateAndStoreAsync(userId, "monthly", $"{year}-{month:D2}", input, BuildMonthlyPrompt(input, year, month), force, ct);
     }
 
-    public async Task RegenerateYearlyNarrativeAsync(Guid userId, int year, CancellationToken ct)
+    public async Task RegenerateYearlyNarrativeAsync(Guid userId, int year, bool force, CancellationToken ct)
     {
         var input = await BuildYearlyInputAsync(userId, year, ct);
-        if (input is null)
-        {
-            return;
-        }
-
-        await GenerateAndStoreAsync(userId, "yearly", year.ToString(), input, BuildYearlyPrompt(input, year), ct);
+        if (input is null) return;
+        await GenerateAndStoreAsync(userId, "yearly", year.ToString(), input, BuildYearlyPrompt(input, year), force, ct);
     }
 
-    private async Task GenerateAndStoreAsync(Guid userId, string summaryType, string scope, object input, string userPrompt, CancellationToken ct)
+    private async Task GenerateAndStoreAsync(Guid userId, string summaryType, string scope, object input, string userPrompt, bool force, CancellationToken ct)
     {
         var provider = await providerResolver.GetNarrativeProviderAsync(userId, ct);
         var configuration = await providerResolver.GetEnabledProviderAsync(userId, ct);
-        if (provider is null || configuration is null)
-        {
-            return;
-        }
+        if (provider is null || configuration is null) return;
 
         var inputJson = JsonSerializer.Serialize(input);
         var cacheKey = ComputeHash(inputJson + SystemPrompt);
 
-        var existing = await dbContext.Summaries
-            .AsNoTracking()
-            .FirstOrDefaultAsync(summary =>
-                summary.UserId == userId
-                && summary.SummaryType == summaryType
-                && summary.Scope == scope
-                && summary.CacheKey == cacheKey,
-                ct);
-
-        if (existing is not null)
+        if (force)
         {
-            return;
+            var stale = await dbContext.Summaries
+                .Where(s => s.UserId == userId && s.SummaryType == summaryType && s.Scope == scope)
+                .ToListAsync(ct);
+            if (stale.Count > 0)
+                dbContext.Summaries.RemoveRange(stale);
+        }
+        else
+        {
+            var existing = await dbContext.Summaries
+                .AsNoTracking()
+                .FirstOrDefaultAsync(s =>
+                    s.UserId == userId && s.SummaryType == summaryType && s.Scope == scope && s.CacheKey == cacheKey, ct);
+            if (existing is not null) return;
         }
 
         try

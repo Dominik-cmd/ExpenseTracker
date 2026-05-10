@@ -232,9 +232,9 @@ public sealed class AnalyticsController(AppDbContext dbContext, ILogger<Analytic
         if (userId is null) return Unauthorized();
 
         var now = DateTime.UtcNow;
-        await narrativeService.RegenerateDashboardNarrativeAsync(userId.Value, ct);
-        await narrativeService.RegenerateMonthlyNarrativeAsync(userId.Value, now.Year, now.Month, ct);
-        await narrativeService.RegenerateYearlyNarrativeAsync(userId.Value, now.Year, ct);
+        await narrativeService.RegenerateDashboardNarrativeAsync(userId.Value, force: true, ct);
+        await narrativeService.RegenerateMonthlyNarrativeAsync(userId.Value, now.Year, now.Month, force: true, ct);
+        await narrativeService.RegenerateYearlyNarrativeAsync(userId.Value, now.Year, force: true, ct);
         return Ok();
     }
 

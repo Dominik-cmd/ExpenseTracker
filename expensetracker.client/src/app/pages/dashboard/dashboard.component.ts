@@ -41,13 +41,9 @@ const DASHBOARD_FALLBACK: DashboardAnalytics = {
         <div class="col-12">
           <div class="narrative-card">
             <div class="narrative-content">{{ narrative()!.content }}</div>
-            <div class="narrative-meta">
-              <i class="pi pi-sparkles" style="font-size: 0.7rem"></i>
-              <span>AI-generated summary</span>
-              @if (narrative()!.isStale) {
-                <span class="narrative-stale">· updating...</span>
-              }
-            </div>
+            @if (narrative()!.isStale) {
+              <div class="narrative-stale">updating...</div>
+            }
           </div>
         </div>
       }
@@ -268,16 +264,9 @@ const DASHBOARD_FALLBACK: DashboardAnalytics = {
       color: var(--text-color);
     }
 
-    .narrative-meta {
-      display: flex;
-      align-items: center;
-      gap: 0.4rem;
-      margin-top: 0.75rem;
-      font-size: 0.7rem;
-      color: var(--text-color-secondary);
-    }
-
     .narrative-stale {
+      margin-top: 0.5rem;
+      font-size: 0.72rem;
       color: var(--yellow-500);
     }
 

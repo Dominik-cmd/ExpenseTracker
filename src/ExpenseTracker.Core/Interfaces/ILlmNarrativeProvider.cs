@@ -17,5 +17,5 @@ public interface ILlmNarrativeProvider
         CancellationToken cancellationToken = default);
 }
 
-public record NarrativeRequest(string SystemPrompt, string UserPrompt, int MaxTokens = 300);
+public record NarrativeRequest(string SystemPrompt, string UserPrompt, int MaxTokens = 5000);
 public record NarrativeResult(string Content, int? TokensUsed, string ModelUsed);
