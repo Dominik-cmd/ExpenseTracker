@@ -35,7 +35,7 @@ const DASHBOARD_FALLBACK: DashboardAnalytics = {
   imports: [CommonModule, CardModule, NgxEchartsDirective, RouterLink],
   template: `
     <div class="dashboard-root">
-      <div class="top-strip">
+      <div class="widget-card summary-card">
         <div class="strip-numbers">
           <span class="strip-item">
             <span class="strip-label">This month</span>
@@ -63,14 +63,14 @@ const DASHBOARD_FALLBACK: DashboardAnalytics = {
       </div>
 
       <div class="main-grid">
-        <div class="widget-card">
+        <div class="widget-card flex-card">
           <div class="widget-header">
             <span class="widget-title">Recent transactions</span>
             <a class="see-all-link" routerLink="/transactions">See all →</a>
           </div>
           @if ((analytics()?.recentTransactions?.length ?? 0) > 0) {
             <div class="txn-list">
-              @for (t of analytics()?.recentTransactions ?? []; track t.id) {
+              @for (t of (analytics()?.recentTransactions ?? []).slice(0, 8); track t.id) {
                 <div class="txn-row">
                   <span class="txn-dot" [style.background]="getCategoryColor(t)"></span>
                   <span class="txn-date">{{ t.transactionDate | date:'dd MMM' }}</span>
@@ -86,7 +86,7 @@ const DASHBOARD_FALLBACK: DashboardAnalytics = {
           }
         </div>
 
-        <div class="widget-card">
+        <div class="widget-card flex-card">
           <div class="widget-header">
             <div>
               <div class="widget-title">Spending this month</div>
@@ -129,11 +129,11 @@ const DASHBOARD_FALLBACK: DashboardAnalytics = {
     .dashboard-root {
       display: flex;
       flex-direction: column;
-      gap: 1.5rem;
+      gap: 1.25rem;
     }
 
-    .top-strip {
-      padding: 0.5rem 0 0.25rem;
+    .summary-card {
+      /* inherits widget-card box; just stacks vertically */
     }
 
     .strip-numbers {
@@ -185,6 +185,7 @@ const DASHBOARD_FALLBACK: DashboardAnalytics = {
       display: grid;
       grid-template-columns: 1fr 1fr;
       gap: 1.25rem;
+      align-items: stretch;
     }
 
     @media (max-width: 768px) {
@@ -198,6 +199,11 @@ const DASHBOARD_FALLBACK: DashboardAnalytics = {
       border: 1px solid var(--surface-border);
       border-radius: 12px;
       padding: 1.25rem 1.5rem;
+    }
+
+    .flex-card {
+      display: flex;
+      flex-direction: column;
     }
 
     .widget-header {
@@ -237,6 +243,7 @@ const DASHBOARD_FALLBACK: DashboardAnalytics = {
     }
 
     .txn-list {
+      flex: 1;
       display: flex;
       flex-direction: column;
       gap: 0;
@@ -284,8 +291,10 @@ const DASHBOARD_FALLBACK: DashboardAnalytics = {
     }
 
     .leaderboard-list {
+      flex: 1;
       display: flex;
       flex-direction: column;
+      justify-content: space-between;
       gap: 0.65rem;
     }
 
