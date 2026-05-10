@@ -60,13 +60,16 @@ public sealed class CustomWebApplicationFactory : WebApplicationFactory<Program>
       services.RemoveAll(typeof(DbContextOptions));
       services.RemoveAll(typeof(IDbContextOptionsConfiguration<AppDbContext>));
 
-      var smsHostedService = services.SingleOrDefault(descriptor =>
-              descriptor.ServiceType == typeof(IHostedService) &&
-              descriptor.ImplementationType == typeof(SmsProcessingBackgroundService));
+      var hostedServicesToRemove = services
+          .Where(descriptor =>
+              descriptor.ServiceType == typeof(IHostedService)
+              && (descriptor.ImplementationType == typeof(SmsProcessingBackgroundService)
+                  || descriptor.ImplementationType == typeof(NarrativeRegenerationWorker)))
+          .ToList();
 
-      if (smsHostedService is not null)
+      foreach (var hostedService in hostedServicesToRemove)
       {
-        services.Remove(smsHostedService);
+        services.Remove(hostedService);
       }
 
       services.AddDbContext<AppDbContext>(options => options.UseInMemoryDatabase(_databaseName));

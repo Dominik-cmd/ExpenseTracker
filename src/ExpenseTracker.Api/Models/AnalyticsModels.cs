@@ -8,13 +8,23 @@ namespace ExpenseTracker.Api.Models
 public sealed record DashboardResponse(
     DashboardKpi Kpi,
     List<CategoryBreakdown> CategoryBreakdown,
+    List<CategoryComparison> CategoryComparisons,
     List<DailySpending> DailySpending,
     List<TopMerchant> TopMerchants,
     List<TransactionDto> RecentTransactions,
     YtdWidget Ytd,
     IncomeWidget? Income);
 
-public sealed record DashboardKpi(decimal CurrentMonth, decimal Last30Days, decimal Prev30Days, decimal PercentChange);
+public sealed record DashboardKpi(
+    decimal CurrentMonth,
+    decimal Last30Days,
+    decimal Prev30Days,
+    decimal PercentChange,
+    decimal ProjectedMonthEnd,
+    decimal? SameMonthLastYear,
+    decimal NetFlow30d,
+    decimal Income30d,
+    decimal Spending30d);
 
 public sealed record CategoryBreakdown(string Name, string? Color, decimal Amount, decimal Percentage);
 
@@ -56,6 +66,7 @@ public sealed record InsightsResponse(
     List<CalendarHeatmapPoint> CalendarHeatmap,
     List<DayOfWeekAverage> DayOfWeekAverages,
     List<RecurringTransactionInsight> RecurringTransactions,
+    List<RecurringTransactionInsight> SubscriptionAnomalies,
     List<FirstTimeMerchantInsight> FirstTimeMerchants,
     List<DateTime> QuietDays);
 
@@ -63,7 +74,15 @@ public sealed record CalendarHeatmapPoint(DateTime Date, decimal Amount);
 
 public sealed record DayOfWeekAverage(string DayOfWeek, decimal AverageAmount, int TransactionCount);
 
-public sealed record RecurringTransactionInsight(string Merchant, decimal AverageAmount, decimal LatestAmount, DateTime LatestDate, bool IsAnomaly);
+public sealed record RecurringTransactionInsight(
+    string Merchant,
+    decimal AverageAmount,
+    decimal LatestAmount,
+    DateTime LatestDate,
+    bool IsAnomaly,
+    string Cadence,
+    int OccurrenceCount,
+    decimal DeviationPercent);
 
 public sealed record FirstTimeMerchantInsight(string Merchant, decimal Amount, DateTime TransactionDate);
 

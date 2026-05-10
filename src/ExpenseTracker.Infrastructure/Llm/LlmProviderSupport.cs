@@ -157,6 +157,7 @@ internal static class LlmProviderSupport
                 SystemPrompt = systemPrompt,
                 UserPrompt = userPrompt,
                 ResponseRaw = responseRaw,
+                Purpose = "categorize",
                 ParsedCategory = result?.CategoryName,
                 ParsedSubcategory = result?.SubcategoryName,
                 ParsedConfidence = result?.Confidence,

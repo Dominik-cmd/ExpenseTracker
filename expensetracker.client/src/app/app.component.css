@@ -113,6 +113,47 @@
   flex: 1;
 }
 
+.nav-group {
+  margin-bottom: 0.5rem;
+}
+
+.nav-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-color-secondary);
+  cursor: pointer;
+  user-select: none;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.nav-group-header:hover {
+  background: var(--surface-hover);
+}
+
+.nav-group-header--static {
+  cursor: default;
+}
+
+.nav-group-header--static:hover {
+  background: transparent;
+}
+
+.nav-group-label {
+  font-size: 0.7rem;
+}
+
+.nav-group-header i {
+  font-size: 0.7rem;
+  transition: transform 0.2s;
+}
+
 .nav-link {
   display: flex;
   align-items: center;

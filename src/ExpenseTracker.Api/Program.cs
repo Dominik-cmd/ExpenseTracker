@@ -35,17 +35,23 @@ builder.Services.AddControllers().AddJsonOptions(options => options.JsonSerializ
 builder.Services.AddMemoryCache();
 builder.Services.AddDbContext<AppDbContext>(options => options.UseNpgsql(connectionString));
 builder.Services.AddSingleton(Channel.CreateUnbounded<Guid>());
+builder.Services.AddSingleton(Channel.CreateUnbounded<NarrativeRegenerationRequest>());
 builder.Services.AddScoped<JwtService>();
 builder.Services.AddScoped<SeedDataService>();
 builder.Services.AddScoped<OtpBankaSmsParser>();
+builder.Services.AddScoped<NarrativeService>();
 builder.Services.AddScoped<ILlmProviderResolver, LlmProviderResolver>();
 builder.Services.AddScoped<ILlmCategorizationProvider, OpenAiCategorizationProvider>();
 builder.Services.AddScoped<ILlmCategorizationProvider, AnthropicCategorizationProvider>();
 builder.Services.AddScoped<ILlmCategorizationProvider, GeminiCategorizationProvider>();
+builder.Services.AddScoped<ILlmNarrativeProvider, OpenAiCategorizationProvider>();
+builder.Services.AddScoped<ILlmNarrativeProvider, AnthropicCategorizationProvider>();
+builder.Services.AddScoped<ILlmNarrativeProvider, GeminiCategorizationProvider>();
 builder.Services.AddHttpClient("OpenAi");
 builder.Services.AddHttpClient("Anthropic");
 builder.Services.AddHttpClient("Gemini");
 builder.Services.AddHostedService<SmsProcessingBackgroundService>();
+builder.Services.AddHostedService<NarrativeRegenerationWorker>();
 
 var keyPath = Environment.GetEnvironmentVariable("DATA_PROTECTION_KEY_PATH")
     ?? Path.Combine(builder.Environment.ContentRootPath, "data-protection-keys");

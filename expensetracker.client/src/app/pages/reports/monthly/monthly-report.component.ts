@@ -2,14 +2,14 @@ import { CommonModule } from '@angular/common';
 import { Component, computed, DestroyRef, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { catchError, of } from 'rxjs';
+import { catchError, forkJoin, of } from 'rxjs';
 import { CardModule } from 'primeng/card';
 import { InputTextModule } from 'primeng/inputtext';
 import { TableModule } from 'primeng/table';
 import { NgxEchartsDirective } from 'ngx-echarts';
 import { EChartsOption } from 'echarts';
 
-import { ApiService, MonthlyReport } from '../../../core/services/api.service';
+import { ApiService, MonthlyReport, NarrativeResponse } from '../../../core/services/api.service';
 
 const now = new Date();
 const MONTHLY_FALLBACK: MonthlyReport = {
@@ -30,6 +30,19 @@ const MONTHLY_FALLBACK: MonthlyReport = {
   imports: [CommonModule, FormsModule, CardModule, InputTextModule, TableModule, NgxEchartsDirective],
   template: `
     <div class="flex flex-column gap-4">
+      @if (narrative()?.content) {
+        <div class="narrative-card">
+          <div class="narrative-content">{{ narrative()!.content }}</div>
+          <div class="narrative-meta">
+            <i class="pi pi-sparkles" style="font-size: 0.7rem"></i>
+            <span>AI-generated summary</span>
+            @if (narrative()!.isStale) {
+              <span class="narrative-stale">· updating...</span>
+            }
+          </div>
+        </div>
+      }
+
       <p-card header="Monthly report" subheader="Trends, category shifts, and merchant concentration for the selected month.">
         <div class="flex flex-column md:flex-row gap-3 align-items-end">
           <div class="flex flex-column gap-2">
@@ -87,6 +100,33 @@ const MONTHLY_FALLBACK: MonthlyReport = {
     </div>
   `,
   styles: [`
+    .narrative-card {
+      background: color-mix(in srgb, var(--primary-color) 5%, var(--surface-card));
+      border: 1px solid color-mix(in srgb, var(--primary-color) 20%, var(--surface-border));
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+    }
+
+    .narrative-content {
+      font-size: 1.05rem;
+      line-height: 1.6;
+      font-style: italic;
+      color: var(--text-color);
+    }
+
+    .narrative-meta {
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+      margin-top: 0.75rem;
+      font-size: 0.7rem;
+      color: var(--text-color-secondary);
+    }
+
+    .narrative-stale {
+      color: var(--yellow-500);
+    }
+
     .chart { width: 100%; height: 22rem; }
     .metric-label { color: var(--text-color-secondary); font-size: 0.875rem; }
     .metric-value { font-size: 1.35rem; font-weight: 600; margin-top: 0.35rem; }
@@ -98,6 +138,7 @@ export class MonthlyReportComponent {
 
   protected readonly selectedMonth = signal(`${MONTHLY_FALLBACK.year}-${String(MONTHLY_FALLBACK.month).padStart(2, '0')}`);
   protected readonly report = signal<MonthlyReport>(MONTHLY_FALLBACK);
+  protected readonly narrative = signal<NarrativeResponse | null>(null);
 
   protected readonly trendOptions = computed<EChartsOption>(() => {
     const points = this.report().dailySpending;
@@ -129,10 +170,19 @@ export class MonthlyReportComponent {
   }
 
   private loadReport(year: number, month: number): void {
-    this.apiService.getMonthlyAnalytics(year, month).pipe(
-      catchError(() => of({ ...MONTHLY_FALLBACK, year, month })),
+    forkJoin({
+      report: this.apiService.getMonthlyAnalytics(year, month).pipe(
+        catchError(() => of({ ...MONTHLY_FALLBACK, year, month }))
+      ),
+      narrative: this.apiService.getMonthlyNarrative(year, month).pipe(
+        catchError(() => of(null))
+      )
+    }).pipe(
       takeUntilDestroyed(this.destroyRef)
-    ).subscribe((report) => this.report.set(report));
+    ).subscribe(({ report, narrative }) => {
+      this.report.set(report);
+      this.narrative.set(narrative);
+    });
   }
 }
 

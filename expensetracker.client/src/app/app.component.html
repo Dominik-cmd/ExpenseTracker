@@ -14,16 +14,38 @@
     </div>
 
     <nav class="nav-links">
-      <a
-        *ngFor="let item of navItems()"
-        [routerLink]="item.route"
-        routerLinkActive="active"
-        [routerLinkActiveOptions]="{ exact: true }"
-        class="nav-link"
-        [title]="sidebarCollapsed() ? item.label : ''">
-        <i [class]="item.icon"></i>
-        <span class="nav-label" *ngIf="!sidebarCollapsed()">{{ item.label }}</span>
-      </a>
+      @for (group of navGroups(); track group.label) {
+        <div class="nav-group">
+          @if (!sidebarCollapsed()) {
+            @if (group.collapsible) {
+              <div class="nav-group-header" (click)="toggleSection(group.label)">
+                <span class="nav-group-label">{{ group.label }}</span>
+                <i class="pi" [ngClass]="isSectionExpanded(group) ? 'pi-chevron-down' : 'pi-chevron-right'"></i>
+              </div>
+            } @else {
+              <div class="nav-group-header nav-group-header--static">
+                <span class="nav-group-label">{{ group.label }}</span>
+              </div>
+            }
+          }
+
+          @if (isSectionExpanded(group)) {
+            @for (item of group.items; track item.route) {
+              <a
+                [routerLink]="item.route"
+                routerLinkActive="active"
+                [routerLinkActiveOptions]="{ exact: true }"
+                class="nav-link"
+                [title]="sidebarCollapsed() ? item.label : ''">
+                <i [class]="item.icon"></i>
+                @if (!sidebarCollapsed()) {
+                  <span class="nav-label">{{ item.label }}</span>
+                }
+              </a>
+            }
+          }
+        </div>
+      }
     </nav>
   </aside>
 

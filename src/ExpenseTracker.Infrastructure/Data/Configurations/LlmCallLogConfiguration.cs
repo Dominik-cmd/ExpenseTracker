@@ -15,6 +15,7 @@ internal sealed class LlmCallLogConfiguration : IEntityTypeConfiguration<LlmCall
         builder.Property(x => x.Model).HasMaxLength(100).IsRequired();
         builder.Property(x => x.SystemPrompt).IsRequired();
         builder.Property(x => x.UserPrompt).IsRequired();
+        builder.Property(x => x.Purpose).HasMaxLength(100).HasDefaultValue("categorize").IsRequired();
         builder.Property(x => x.MerchantRaw).HasMaxLength(500);
         builder.Property(x => x.MerchantNormalized).HasMaxLength(500);
         builder.Property(x => x.Amount).HasPrecision(18, 2);

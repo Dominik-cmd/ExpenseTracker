@@ -192,6 +192,11 @@ export interface DashboardKpi {
   last30Days: number;
   prev30Days: number;
   percentChange: number;
+  projectedMonthEnd: number;
+  sameMonthLastYear?: number | null;
+  netFlow30d: number;
+  income30d: number;
+  spending30d: number;
 }
 
 export interface CategoryBreakdown {
@@ -225,11 +230,19 @@ export interface YtdWidget {
 export interface DashboardAnalytics {
   kpi: DashboardKpi;
   categoryBreakdown: CategoryBreakdown[];
+  categoryComparisons: CategoryComparison[];
   dailySpending: DailySpending[];
   topMerchants: TopMerchant[];
   recentTransactions: Transaction[];
   ytd: YtdWidget;
   income?: IncomeWidget | null;
+}
+
+export interface NarrativeResponse {
+  content: string | null;
+  generatedAt: string;
+  modelUsed: string;
+  isStale: boolean;
 }
 
 export interface IncomeWidget {
@@ -289,6 +302,7 @@ export interface MonthlyValue {
 
 export interface MonthlyCategorySeries {
   categoryName: string;
+  color?: string | null;
   values: MonthlyValue[];
 }
 
@@ -319,6 +333,9 @@ export interface RecurringTransactionInsight {
   latestAmount: number;
   latestDate: string;
   isAnomaly: boolean;
+  cadence: string;
+  occurrenceCount: number;
+  deviationPercent: number;
 }
 
 export interface FirstTimeMerchantInsight {
@@ -331,6 +348,7 @@ export interface InsightsReport {
   calendarHeatmap: CalendarHeatmapPoint[];
   dayOfWeekAverages: DayOfWeekAverage[];
   recurringTransactions: RecurringTransactionInsight[];
+  subscriptionAnomalies: RecurringTransactionInsight[];
   firstTimeMerchants: FirstTimeMerchantInsight[];
   quietDays: string[];
 }
@@ -512,9 +530,19 @@ export class ApiService {
     return this.http.get<DashboardAnalytics>(buildApiUrl('/api/analytics/dashboard'));
   }
 
+  getDashboardNarrative(): Observable<NarrativeResponse | null> {
+    return this.http.get<NarrativeResponse | null>(buildApiUrl('/api/analytics/dashboard/narrative'));
+  }
+
   getMonthlyAnalytics(year: number, month: number): Observable<MonthlyReport> {
     return this.http.get<MonthlyReport>(buildApiUrl('/api/analytics/monthly'), {
       params: this.createParams({ year, month })
+    });
+  }
+
+  getMonthlyNarrative(year: number, month: number): Observable<NarrativeResponse | null> {
+    return this.http.get<NarrativeResponse | null>(buildApiUrl('/api/analytics/monthly/narrative'), {
+      params: new HttpParams().set('year', year).set('month', month)
     });
   }
 
@@ -522,6 +550,16 @@ export class ApiService {
     return this.http.get<YearlyReport>(buildApiUrl('/api/analytics/yearly'), {
       params: this.createParams({ year })
     });
+  }
+
+  getYearlyNarrative(year: number): Observable<NarrativeResponse | null> {
+    return this.http.get<NarrativeResponse | null>(buildApiUrl('/api/analytics/yearly/narrative'), {
+      params: new HttpParams().set('year', year)
+    });
+  }
+
+  regenerateNarratives(): Observable<void> {
+    return this.http.post<void>(buildApiUrl('/api/analytics/regenerate-narratives'), {});
   }
 
   getInsightsAnalytics(): Observable<InsightsReport> {

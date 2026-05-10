@@ -13,7 +13,7 @@ using Polly;
 
 namespace ExpenseTracker.Infrastructure;
 
-public sealed class OpenAiCategorizationProvider : ILlmCategorizationProvider
+public sealed class OpenAiCategorizationProvider : ILlmCategorizationProvider, ILlmNarrativeProvider
 {
     private readonly AppDbContext _dbContext;
     private readonly IHttpClientFactory _httpClientFactory;
@@ -121,6 +121,57 @@ public sealed class OpenAiCategorizationProvider : ILlmCategorizationProvider
             stopwatch.ElapsedMilliseconds, success, errorMessage, request, cancellationToken);
 
         return categorizationResult;
+    }
+
+    public Task<NarrativeResult> GenerateAsync(NarrativeRequest request, CancellationToken cancellationToken = default)
+        => GenerateAsyncInternal(null, request, cancellationToken);
+
+    public Task<NarrativeResult> GenerateAsync(LlmProvider configuration, NarrativeRequest request, CancellationToken cancellationToken = default)
+        => GenerateAsyncInternal(configuration, request, cancellationToken);
+
+    private async Task<NarrativeResult> GenerateAsyncInternal(LlmProvider? configuration, NarrativeRequest request, CancellationToken cancellationToken)
+    {
+        configuration ??= await GetConfigurationAsync(cancellationToken);
+        var apiKey = LlmProviderSupport.DecryptApiKey(_protector, _legacyProtector, configuration.ApiKeyEncrypted);
+        var client = _httpClientFactory.CreateClient(nameof(LlmProviderType.OpenAi));
+        client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", apiKey);
+
+        var response = await _retryPolicy.ExecuteAsync(async token =>
+        {
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Post, "https://api.openai.com/v1/chat/completions")
+            {
+                Content = JsonContent.Create(new
+                {
+                    model = configuration.Model,
+                    messages = new object[]
+                    {
+                        new { role = "system", content = request.SystemPrompt },
+                        new { role = "user", content = request.UserPrompt }
+                    },
+                    max_tokens = request.MaxTokens,
+                    temperature = 0.3
+                })
+            };
+
+            return await client.SendAsync(requestMessage, token);
+        }, cancellationToken);
+        try
+        {
+            response.EnsureSuccessStatusCode();
+            var responseRaw = await response.Content.ReadAsStringAsync(cancellationToken);
+            using var document = JsonDocument.Parse(responseRaw);
+            var root = document.RootElement;
+            var content = root.GetProperty("choices")[0].GetProperty("message").GetProperty("content").GetString() ?? string.Empty;
+            var tokensUsed = root.TryGetProperty("usage", out var usage) && usage.TryGetProperty("total_tokens", out var totalTokens)
+                ? totalTokens.GetInt32()
+                : (int?)null;
+
+            return new NarrativeResult(content.Trim(), tokensUsed, configuration.Model);
+        }
+        finally
+        {
+            response.Dispose();
+        }
     }
 
     private async Task<LlmProvider> GetConfigurationAsync(CancellationToken cancellationToken)

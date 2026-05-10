@@ -14,6 +14,7 @@ public sealed class LlmLogsController(AppDbContext dbContext) : ApiControllerBas
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20,
         [FromQuery] string? provider = null,
+        [FromQuery] string? purpose = null,
         [FromQuery] bool? successOnly = null,
         CancellationToken ct = default)
     {
@@ -27,6 +28,9 @@ public sealed class LlmLogsController(AppDbContext dbContext) : ApiControllerBas
 
         if (!string.IsNullOrWhiteSpace(provider))
             query = query.Where(x => x.ProviderType == provider);
+
+        if (!string.IsNullOrWhiteSpace(purpose))
+            query = query.Where(x => x.Purpose == purpose);
 
         if (successOnly.HasValue)
             query = query.Where(x => x.Success == successOnly.Value);
@@ -47,6 +51,7 @@ public sealed class LlmLogsController(AppDbContext dbContext) : ApiControllerBas
                 x.Amount,
                 x.SystemPrompt,
                 x.UserPrompt,
+                x.Purpose,
                 x.ResponseRaw,
                 x.ParsedCategory,
                 x.ParsedSubcategory,

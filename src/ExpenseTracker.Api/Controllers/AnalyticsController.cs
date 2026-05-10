@@ -34,11 +34,51 @@ public sealed class AnalyticsController(AppDbContext dbContext, ILogger<Analytic
             var last30 = SumBetween(spending, last30Start, now);
             var prev30 = SumBetween(spending, prev30Start, prev30End);
             var percentChange = prev30 == 0 ? 0 : Math.Round(((last30 - prev30) / prev30) * 100, 2);
+            var daysElapsed = Math.Max(1, (now.Date - currentMonthStart.Date).Days + 1);
+            var daysInMonth = DateTime.DaysInMonth(now.Year, now.Month);
+            var projectedMonthEnd = Math.Round((currentMonth / daysElapsed * daysInMonth) / 10m) * 10m;
+            var sameMonthLastYearStart = currentMonthStart.AddYears(-1);
+            var sameMonthLastYearEndDay = Math.Min(now.Day, DateTime.DaysInMonth(now.Year - 1, now.Month));
+            var sameMonthLastYearEnd = new DateTime(now.Year - 1, now.Month, sameMonthLastYearEndDay, 0, 0, 0, DateTimeKind.Utc)
+                .AddDays(1)
+                .AddTicks(-1);
+            var sameMonthLastYearAmount = SumBetween(spending, sameMonthLastYearStart, sameMonthLastYearEnd);
+            decimal? sameMonthLastYear = sameMonthLastYearAmount == 0 ? null : sameMonthLastYearAmount;
+            var incomeWidget = BuildIncomeWidget(transactions, now);
+            var income30d = incomeWidget.Last30Days;
+            var spending30d = last30;
+            var netFlow30d = incomeWidget.NetLast30Days;
 
             var last30Transactions = spending.Where(x => x.TransactionDate >= last30Start && x.TransactionDate <= now).ToList();
+            var currentMonthTransactions = spending.Where(x => x.TransactionDate >= currentMonthStart && x.TransactionDate <= now).ToList();
+            var previousMonthStart = currentMonthStart.AddMonths(-1);
+            var previousMonthEnd = currentMonthStart.AddTicks(-1);
+            var previousMonthTransactions = spending.Where(x => x.TransactionDate >= previousMonthStart && x.TransactionDate <= previousMonthEnd).ToList();
+            var currentMonthCategoryTotals = currentMonthTransactions
+                .GroupBy(GetCategoryKey)
+                .ToDictionary(group => group.Key, group => group.Sum(x => x.Amount));
+            var previousMonthCategoryTotals = previousMonthTransactions
+                .GroupBy(GetCategoryKey)
+                .ToDictionary(group => group.Key, group => group.Sum(x => x.Amount));
+            var categoryComparisons = currentMonthCategoryTotals.Keys
+                .Union(previousMonthCategoryTotals.Keys)
+                .Select(categoryName =>
+                {
+                    var currentAmount = currentMonthCategoryTotals.GetValueOrDefault(categoryName);
+                    var previousAmount = previousMonthCategoryTotals.GetValueOrDefault(categoryName);
+                    var deltaAmount = currentAmount - previousAmount;
+                    var deltaPercent = previousAmount == 0 ? 0 : Math.Round((deltaAmount / previousAmount) * 100, 2);
+                    return new CategoryComparison(categoryName, currentAmount, previousAmount, deltaAmount, deltaPercent);
+                })
+                .OrderByDescending(x => Math.Abs(x.DeltaAmount))
+                .ThenByDescending(x => x.CurrentAmount)
+                .Take(8)
+                .ToList();
+
             var response = new DashboardResponse(
-                new DashboardKpi(currentMonth, last30, prev30, percentChange),
+                new DashboardKpi(currentMonth, last30, prev30, percentChange, projectedMonthEnd, sameMonthLastYear, netFlow30d, income30d, spending30d),
                 BuildCategoryBreakdown(last30Transactions),
+                categoryComparisons,
                 BuildDailySpending(last30Transactions, last30Start.Date, now.Date),
                 last30Transactions.Where(x => !string.IsNullOrWhiteSpace(x.MerchantNormalized))
                     .GroupBy(x => x.MerchantNormalized)
@@ -48,7 +88,7 @@ public sealed class AnalyticsController(AppDbContext dbContext, ILogger<Analytic
                     .ToList(),
                 transactions.OrderByDescending(x => x.TransactionDate).ThenByDescending(x => x.CreatedAt).Take(10).Select(x => x.ToDto()).ToList(),
                 BuildYtdWidget(spending, now),
-                BuildIncomeWidget(transactions, now));
+                incomeWidget);
 
             return Ok(response);
         }
@@ -158,6 +198,88 @@ public sealed class AnalyticsController(AppDbContext dbContext, ILogger<Analytic
         }
     }
 
+    [HttpGet("dashboard/narrative")]
+    public async Task<ActionResult<NarrativeResponse?>> GetDashboardNarrativeAsync([FromServices] NarrativeService narrativeService, CancellationToken ct)
+    {
+        var userId = GetCurrentUserId();
+        if (userId is null) return Unauthorized();
+        var result = await narrativeService.GetDashboardNarrativeAsync(userId.Value, ct);
+        return Ok(result);
+    }
+
+    [HttpGet("monthly/narrative")]
+    public async Task<ActionResult<NarrativeResponse?>> GetMonthlyNarrativeAsync([FromQuery] int year, [FromQuery] int month, [FromServices] NarrativeService narrativeService, CancellationToken ct)
+    {
+        var userId = GetCurrentUserId();
+        if (userId is null) return Unauthorized();
+        var result = await narrativeService.GetMonthlyNarrativeAsync(userId.Value, year, month, ct);
+        return Ok(result);
+    }
+
+    [HttpGet("yearly/narrative")]
+    public async Task<ActionResult<NarrativeResponse?>> GetYearlyNarrativeAsync([FromQuery] int year, [FromServices] NarrativeService narrativeService, CancellationToken ct)
+    {
+        var userId = GetCurrentUserId();
+        if (userId is null) return Unauthorized();
+        var result = await narrativeService.GetYearlyNarrativeAsync(userId.Value, year, ct);
+        return Ok(result);
+    }
+
+    [HttpPost("regenerate-narratives")]
+    public async Task<ActionResult> RegenerateNarrativesAsync([FromServices] NarrativeService narrativeService, CancellationToken ct)
+    {
+        var userId = GetCurrentUserId();
+        if (userId is null) return Unauthorized();
+
+        var now = DateTime.UtcNow;
+        await narrativeService.RegenerateDashboardNarrativeAsync(userId.Value, ct);
+        await narrativeService.RegenerateMonthlyNarrativeAsync(userId.Value, now.Year, now.Month, ct);
+        await narrativeService.RegenerateYearlyNarrativeAsync(userId.Value, now.Year, ct);
+        return Ok();
+    }
+
+    [HttpGet("cost-summary")]
+    public async Task<ActionResult> GetCostSummaryAsync(CancellationToken ct)
+    {
+        var userId = GetCurrentUserId();
+        if (userId is null) return Unauthorized();
+
+        var now = DateTime.UtcNow;
+        var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var logs = await dbContext.LlmCallLogs
+            .AsNoTracking()
+            .Where(log => log.UserId == userId.Value && log.CreatedAt >= monthStart && log.Success)
+            .ToListAsync(ct);
+
+        var categorizationLogs = logs
+            .Where(log => string.Equals(log.Purpose, "categorize", StringComparison.Ordinal))
+            .ToList();
+        var narrativeLogs = logs
+            .Where(log => !string.IsNullOrEmpty(log.Purpose) && log.Purpose.StartsWith("summary:", StringComparison.Ordinal))
+            .ToList();
+
+        var summaryTokens = await dbContext.Summaries
+            .AsNoTracking()
+            .Where(summary => summary.UserId == userId.Value && summary.GeneratedAt >= monthStart)
+            .SumAsync(summary => summary.TokensUsed ?? 0, ct);
+
+        return Ok(new
+        {
+            categorization = new
+            {
+                count = categorizationLogs.Count,
+                tokens = 0
+            },
+            narrative = new
+            {
+                count = narrativeLogs.Count,
+                tokens = summaryTokens
+            },
+            totalCalls = logs.Count
+        });
+    }
+
     [HttpGet("insights")]
     public async Task<ActionResult<InsightsResponse>> GetInsightsAsync(CancellationToken ct)
     {
@@ -171,19 +293,48 @@ public sealed class AnalyticsController(AppDbContext dbContext, ILogger<Analytic
             var spending = transactions.Where(x => x.Direction == Direction.Debit && !IsExcludedFromExpenses(x) && x.TransactionDate >= yearStart).ToList();
             var calendarHeatmap = spending.GroupBy(x => x.TransactionDate.Date).Select(x => new CalendarHeatmapPoint(x.Key, x.Sum(y => y.Amount))).OrderBy(x => x.Date).ToList();
             var dayOfWeekAverages = spending.GroupBy(x => x.TransactionDate.DayOfWeek).Select(x => new DayOfWeekAverage(x.Key.ToString(), Math.Round(x.Average(y => y.Amount), 2), x.Count())).ToList();
+            var adHocCategories = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                "Groceries", "Restaurants", "Fuel", "Shopping", "Food", "Dining"
+            };
+
             var recurringTransactions = spending
                 .Where(x => !string.IsNullOrWhiteSpace(x.MerchantNormalized))
                 .GroupBy(x => x.MerchantNormalized)
-                .Where(x => x.Count() >= 3)
-                .Select(x =>
+                .Where(group => group.Count() >= 3)
+                .Select(group =>
                 {
-                    var ordered = x.OrderBy(y => y.TransactionDate).ToList();
-                    var average = x.Average(y => y.Amount);
+                    var ordered = group.OrderBy(y => y.TransactionDate).ToList();
+                    var average = group.Average(y => y.Amount);
                     var latest = ordered[^1];
-                    var isAnomaly = average > 0 && Math.Abs((double)(latest.Amount - average) / (double)average) > 0.2;
-                    return new RecurringTransactionInsight(x.Key, Math.Round(average, 2), latest.Amount, latest.TransactionDate, isAnomaly);
+                    var count = ordered.Count;
+                    var cadence = DetermineCadence(ordered);
+                    var categoryName = latest.Category.ParentCategory?.Name ?? latest.Category.Name;
+                    var isAdHoc = adHocCategories.Contains(categoryName);
+                    var deviationPercent = average > 0 ? Math.Round((double)Math.Abs(latest.Amount - average) / (double)average * 100, 1) : 0;
+                    var deviationAbsolute = Math.Abs(latest.Amount - average);
+                    var isAnomaly = !isAdHoc
+                        && cadence != "variable"
+                        && count >= 4
+                        && deviationPercent > 25
+                        && deviationAbsolute > 5;
+
+                    return new RecurringTransactionInsight(
+                        group.Key,
+                        Math.Round(average, 2),
+                        latest.Amount,
+                        latest.TransactionDate,
+                        isAnomaly,
+                        cadence,
+                        count,
+                        (decimal)deviationPercent);
                 })
                 .OrderByDescending(x => x.LatestDate)
+                .ToList();
+
+            var subscriptionAnomalies = recurringTransactions
+                .Where(x => x.IsAnomaly)
+                .OrderByDescending(x => x.DeviationPercent)
                 .ToList();
 
             var monthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
@@ -204,7 +355,7 @@ public sealed class AnalyticsController(AppDbContext dbContext, ILogger<Analytic
                 .Where(date => date <= now.Date && spending.All(x => x.TransactionDate.Date != date))
                 .ToList();
 
-            return Ok(new InsightsResponse(calendarHeatmap, dayOfWeekAverages, recurringTransactions, firstTimeMerchants, quietDays));
+            return Ok(new InsightsResponse(calendarHeatmap, dayOfWeekAverages, recurringTransactions, subscriptionAnomalies, firstTimeMerchants, quietDays));
         }
         catch (Exception ex)
         {
@@ -267,6 +418,27 @@ public sealed class AnalyticsController(AppDbContext dbContext, ILogger<Analytic
         var previousComparable = transactions.Where(x => x.TransactionDate >= previousStart && x.TransactionDate <= previousComparableEnd).Sum(x => x.Amount);
         var yoyDelta = previousComparable == 0 ? (decimal?)null : Math.Round(((total - previousComparable) / previousComparable) * 100, 2);
         return new YtdWidget(total, avgPerDay, projected, yoyDelta, BuildCategoryBreakdown(ytdTransactions).Take(5).ToList());
+    }
+
+    private static string DetermineCadence(List<Transaction> orderedTransactions)
+    {
+        if (orderedTransactions.Count < 3) return "variable";
+
+        var intervals = new List<double>();
+        for (int i = 1; i < orderedTransactions.Count; i++)
+        {
+            intervals.Add((orderedTransactions[i].TransactionDate - orderedTransactions[i - 1].TransactionDate).TotalDays);
+        }
+
+        var avgInterval = intervals.Average();
+        var stdDev = Math.Sqrt(intervals.Average(x => Math.Pow(x - avgInterval, 2)));
+        var cv = avgInterval > 0 ? stdDev / avgInterval : double.MaxValue;
+
+        if (cv > 0.5) return "variable";
+        if (avgInterval <= 10) return "weekly";
+        if (avgInterval <= 45) return "monthly";
+        if (avgInterval <= 380) return "yearly";
+        return "variable";
     }
 
     private static string GetCategoryKey(Transaction transaction)

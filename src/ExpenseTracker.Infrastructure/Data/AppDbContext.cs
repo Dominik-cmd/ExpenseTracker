@@ -16,6 +16,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
     public DbSet<Setting> Settings => Set<Setting>();
     public DbSet<LlmCallLog> LlmCallLogs => Set<LlmCallLog>();
+    public DbSet<Summary> Summaries => Set<Summary>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

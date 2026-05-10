@@ -189,6 +189,30 @@ public sealed class SeedDataService : IHostedService
               END IF;
             END $$;
             """, cancellationToken);
+
+        await _dbContext.Database.ExecuteSqlRawAsync(
+            "ALTER TABLE llm_call_logs ADD COLUMN IF NOT EXISTS purpose text NOT NULL DEFAULT 'categorize';",
+            cancellationToken);
+
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS summaries (
+                id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                summary_type text NOT NULL,
+                scope text NOT NULL,
+                cache_key text NOT NULL,
+                content text NOT NULL,
+                input_snapshot text NOT NULL DEFAULT '',
+                model_used text NOT NULL DEFAULT '',
+                provider_used text NOT NULL DEFAULT '',
+                tokens_used int,
+                user_id uuid NOT NULL,
+                generated_at timestamptz NOT NULL DEFAULT now()
+            );
+
+            CREATE UNIQUE INDEX IF NOT EXISTS ix_summaries_lookup ON summaries (user_id, summary_type, scope, cache_key);
+            CREATE INDEX IF NOT EXISTS ix_summaries_scope ON summaries (user_id, summary_type, scope, generated_at DESC);
+            CREATE INDEX IF NOT EXISTS ix_summaries_user_id ON summaries (user_id);
+            """, cancellationToken);
     }
 
     private async Task<User?> SeedUserAsync(string initialPassword, CancellationToken cancellationToken)

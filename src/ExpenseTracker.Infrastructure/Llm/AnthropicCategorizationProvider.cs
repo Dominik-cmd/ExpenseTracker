@@ -12,7 +12,7 @@ using Polly;
 
 namespace ExpenseTracker.Infrastructure;
 
-public sealed class AnthropicCategorizationProvider : ILlmCategorizationProvider
+public sealed class AnthropicCategorizationProvider : ILlmCategorizationProvider, ILlmNarrativeProvider
 {
     private readonly AppDbContext _dbContext;
     private readonly IHttpClientFactory _httpClientFactory;
@@ -130,6 +130,67 @@ public sealed class AnthropicCategorizationProvider : ILlmCategorizationProvider
             stopwatch.ElapsedMilliseconds, success, errorMessage, request, cancellationToken);
 
         return categorizationResult;
+    }
+
+    public Task<NarrativeResult> GenerateAsync(NarrativeRequest request, CancellationToken cancellationToken = default)
+        => GenerateAsyncInternal(null, request, cancellationToken);
+
+    public Task<NarrativeResult> GenerateAsync(LlmProvider configuration, NarrativeRequest request, CancellationToken cancellationToken = default)
+        => GenerateAsyncInternal(configuration, request, cancellationToken);
+
+    private async Task<NarrativeResult> GenerateAsyncInternal(LlmProvider? configuration, NarrativeRequest request, CancellationToken cancellationToken)
+    {
+        configuration ??= await GetConfigurationAsync(cancellationToken);
+        var apiKey = LlmProviderSupport.DecryptApiKey(_protector, _legacyProtector, configuration.ApiKeyEncrypted);
+        var client = _httpClientFactory.CreateClient(nameof(LlmProviderType.Anthropic));
+        client.DefaultRequestHeaders.Remove("x-api-key");
+        client.DefaultRequestHeaders.Remove("anthropic-version");
+        client.DefaultRequestHeaders.Add("x-api-key", apiKey);
+        client.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
+
+        var response = await _retryPolicy.ExecuteAsync(async token =>
+        {
+            using var requestMessage = new HttpRequestMessage(HttpMethod.Post, "https://api.anthropic.com/v1/messages")
+            {
+                Content = JsonContent.Create(new
+                {
+                    model = configuration.Model,
+                    system = request.SystemPrompt,
+                    messages = new object[]
+                    {
+                        new
+                        {
+                            role = "user",
+                            content = new object[]
+                            {
+                                new { type = "text", text = request.UserPrompt }
+                            }
+                        }
+                    },
+                    max_tokens = request.MaxTokens,
+                    temperature = 0.3
+                })
+            };
+
+            return await client.SendAsync(requestMessage, token);
+        }, cancellationToken);
+        try
+        {
+            response.EnsureSuccessStatusCode();
+            var responseRaw = await response.Content.ReadAsStringAsync(cancellationToken);
+            using var document = JsonDocument.Parse(responseRaw);
+            var root = document.RootElement;
+            var content = root.GetProperty("content")[0].GetProperty("text").GetString() ?? string.Empty;
+            var tokensUsed = root.TryGetProperty("usage", out var usage)
+                ? usage.GetProperty("input_tokens").GetInt32() + usage.GetProperty("output_tokens").GetInt32()
+                : (int?)null;
+
+            return new NarrativeResult(content.Trim(), tokensUsed, configuration.Model);
+        }
+        finally
+        {
+            response.Dispose();
+        }
     }
 
     private async Task<LlmProvider> GetConfigurationAsync(CancellationToken cancellationToken)

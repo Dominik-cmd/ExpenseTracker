@@ -1,8 +1,7 @@
 import { CommonModule, DOCUMENT, NgClass } from '@angular/common';
-import { Component, computed, DestroyRef, effect, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { ConfirmDialogModule } from 'primeng/confirmdialog';
 import { ToastModule } from 'primeng/toast';
@@ -12,6 +11,7 @@ import { AuthService } from './core/services/auth.service';
 
 const DARK_MODE_KEY = 'expense-tracker.dark-mode';
 const SIDEBAR_KEY = 'expense-tracker.sidebar-collapsed';
+const SIDEBAR_SECTIONS_KEY = 'expense-tracker.sidebar-sections';
 
 interface NavItem {
   label: string;
@@ -20,21 +20,52 @@ interface NavItem {
   adminOnly?: boolean;
 }
 
-const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard', route: '/dashboard', icon: 'pi pi-home' },
-  { label: 'Transactions', route: '/transactions', icon: 'pi pi-wallet' },
-  { label: 'Categories', route: '/categories', icon: 'pi pi-folder-open' },
-  { label: 'Merchant rules', route: '/merchant-rules', icon: 'pi pi-sitemap' },
-  { label: 'Parse failures', route: '/parse-failures', icon: 'pi pi-exclamation-triangle' },
-  { label: 'Processing queue', route: '/queue', icon: 'pi pi-server' },
-  { label: 'Monthly report', route: '/reports/monthly', icon: 'pi pi-chart-line' },
-  { label: 'Yearly report', route: '/reports/yearly', icon: 'pi pi-chart-bar' },
-  { label: 'Insights', route: '/reports/insights', icon: 'pi pi-sparkles' },
-  { label: 'LLM logs', route: '/settings/llm-logs', icon: 'pi pi-list' },
-  { label: 'LLM settings', route: '/settings/llm', icon: 'pi pi-bolt' },
-  { label: 'Account settings', route: '/settings/account', icon: 'pi pi-user' },
-  { label: 'Webhook settings', route: '/settings/webhook', icon: 'pi pi-send' },
-  { label: 'User management', route: '/admin/users', icon: 'pi pi-users', adminOnly: true }
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+  collapsible: boolean;
+  adminOnly?: boolean;
+}
+
+const NAV_GROUPS: NavGroup[] = [
+  {
+    label: 'Primary',
+    collapsible: false,
+    items: [
+      { label: 'Dashboard', route: '/dashboard', icon: 'pi pi-chart-bar' },
+      { label: 'Transactions', route: '/transactions', icon: 'pi pi-wallet' }
+    ]
+  },
+  {
+    label: 'Reports',
+    collapsible: true,
+    items: [
+      { label: 'Monthly', route: '/reports/monthly', icon: 'pi pi-chart-line' },
+      { label: 'Yearly', route: '/reports/yearly', icon: 'pi pi-chart-bar' },
+      { label: 'Insights', route: '/reports/insights', icon: 'pi pi-sparkles' }
+    ]
+  },
+  {
+    label: 'Configuration',
+    collapsible: true,
+    items: [
+      { label: 'Categories', route: '/categories', icon: 'pi pi-folder-open' },
+      { label: 'Merchant rules', route: '/merchant-rules', icon: 'pi pi-sitemap' },
+      { label: 'Parse failures', route: '/parse-failures', icon: 'pi pi-exclamation-triangle' },
+      { label: 'Processing queue', route: '/queue', icon: 'pi pi-server' },
+      { label: 'LLM logs', route: '/settings/llm-logs', icon: 'pi pi-list' }
+    ]
+  },
+  {
+    label: 'Settings',
+    collapsible: true,
+    items: [
+      { label: 'Account', route: '/settings/account', icon: 'pi pi-user' },
+      { label: 'LLM', route: '/settings/llm', icon: 'pi pi-bolt' },
+      { label: 'Webhook', route: '/settings/webhook', icon: 'pi pi-send' },
+      { label: 'User management', route: '/admin/users', icon: 'pi pi-users', adminOnly: true }
+    ]
+  }
 ];
 
 @Component({
@@ -57,16 +88,21 @@ const NAV_ITEMS: NavItem[] = [
 })
 export class AppComponent {
   private readonly authService = inject(AuthService);
-  private readonly destroyRef = inject(DestroyRef);
   private readonly document = inject(DOCUMENT);
-  private readonly router = inject(Router);
 
-  protected readonly navItems = computed(() => {
+  protected readonly navGroups = computed(() => {
     const isAdmin = this.authService.isAdmin();
-    return NAV_ITEMS.filter(item => !item.adminOnly || isAdmin);
+    return NAV_GROUPS
+      .filter(group => !group.adminOnly || isAdmin)
+      .map(group => ({
+        ...group,
+        items: group.items.filter(item => !item.adminOnly || isAdmin)
+      }))
+      .filter(group => group.items.length > 0);
   });
   protected readonly darkMode = signal(this.readDarkModePreference());
   protected readonly sidebarCollapsed = signal(this.readSidebarPreference());
+  protected readonly expandedSections = signal<Set<string>>(this.readSectionPreferences());
   protected readonly isAuthenticated = this.authService.authenticated;
   protected readonly username = computed(() => this.authService.getUsername() ?? 'Expense user');
 
@@ -81,10 +117,35 @@ export class AppComponent {
     effect(() => {
       localStorage.setItem(SIDEBAR_KEY, String(this.sidebarCollapsed()));
     });
+
+    effect(() => {
+      const sections = this.expandedSections();
+      localStorage.setItem(SIDEBAR_SECTIONS_KEY, JSON.stringify([...sections]));
+    });
   }
 
   protected toggleSidebar(): void {
     this.sidebarCollapsed.update((v) => !v);
+  }
+
+  protected toggleSection(label: string): void {
+    this.expandedSections.update(set => {
+      const newSet = new Set(set);
+      if (newSet.has(label)) {
+        newSet.delete(label);
+      } else {
+        newSet.add(label);
+      }
+      return newSet;
+    });
+  }
+
+  protected isSectionExpanded(group: NavGroup): boolean {
+    if (!group.collapsible || this.sidebarCollapsed()) {
+      return true;
+    }
+
+    return this.expandedSections().has(group.label);
   }
 
   protected logout(): void {
@@ -103,6 +164,19 @@ export class AppComponent {
   private readSidebarPreference(): boolean {
     const stored = localStorage.getItem(SIDEBAR_KEY);
     return stored === 'true'; // open by default (collapsed = false)
+  }
+
+  private readSectionPreferences(): Set<string> {
+    try {
+      const stored = localStorage.getItem(SIDEBAR_SECTIONS_KEY);
+      if (stored) {
+        return new Set(JSON.parse(stored));
+      }
+    } catch {
+      return new Set<string>();
+    }
+
+    return new Set<string>();
   }
 }
 

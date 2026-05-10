@@ -8,6 +8,7 @@ public sealed class LlmCallLog
     public string Model { get; set; } = string.Empty;
     public string SystemPrompt { get; set; } = string.Empty;
     public string UserPrompt { get; set; } = string.Empty;
+    public string Purpose { get; set; } = "categorize";  // 'categorize' | 'summary:dashboard' | 'summary:monthly' | 'summary:yearly' | 'summary:anomaly'
     public string? ResponseRaw { get; set; }
     public string? ParsedCategory { get; set; }
     public string? ParsedSubcategory { get; set; }

@@ -12,13 +12,19 @@ public sealed class LlmProviderResolver : ILlmProviderResolver
 
     private readonly AppDbContext _dbContext;
     private readonly IMemoryCache _memoryCache;
-    private readonly IReadOnlyDictionary<LlmProviderType, ILlmCategorizationProvider> _providers;
+    private readonly IReadOnlyDictionary<LlmProviderType, ILlmCategorizationProvider> _categorizationProviders;
+    private readonly IReadOnlyDictionary<LlmProviderType, ILlmNarrativeProvider> _narrativeProviders;
 
-    public LlmProviderResolver(AppDbContext dbContext, IMemoryCache memoryCache, IEnumerable<ILlmCategorizationProvider> providers)
+    public LlmProviderResolver(
+        AppDbContext dbContext,
+        IMemoryCache memoryCache,
+        IEnumerable<ILlmCategorizationProvider> categorizationProviders,
+        IEnumerable<ILlmNarrativeProvider> narrativeProviders)
     {
         _dbContext = dbContext;
         _memoryCache = memoryCache;
-        _providers = providers.ToDictionary(provider => provider.ProviderType);
+        _categorizationProviders = categorizationProviders.ToDictionary(provider => provider.ProviderType);
+        _narrativeProviders = narrativeProviders.ToDictionary(provider => provider.ProviderType);
     }
 
     public Task<ILlmCategorizationProvider?> ResolveAsync(Guid userId, CancellationToken cancellationToken = default)
@@ -32,7 +38,18 @@ public sealed class LlmProviderResolver : ILlmProviderResolver
             return null;
         }
 
-        return _providers.GetValueOrDefault(enabledProvider.ProviderType);
+        return _categorizationProviders.GetValueOrDefault(enabledProvider.ProviderType);
+    }
+
+    public async Task<ILlmNarrativeProvider?> GetNarrativeProviderAsync(Guid userId, CancellationToken cancellationToken = default)
+    {
+        var enabledProvider = await GetEnabledProviderAsync(userId, cancellationToken);
+        if (enabledProvider is null)
+        {
+            return null;
+        }
+
+        return _narrativeProviders.GetValueOrDefault(enabledProvider.ProviderType);
     }
 
     public async Task<LlmProvider?> GetEnabledProviderAsync(Guid userId, CancellationToken cancellationToken = default)

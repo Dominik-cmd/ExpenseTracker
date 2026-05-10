@@ -30,34 +30,41 @@ const PARSE_FAILURES_FALLBACK: RawMessage[] = [
   imports: [CommonModule, FormsModule, ButtonModule, CardModule, DialogModule, InputTextarea, TableModule, TagModule],
   template: `
     <p-card header="Parse failures" subheader="Inspect inbound SMS payloads, preview the raw body, and retry parsing workflows.">
-      <p-table [value]="messages()" responsiveLayout="scroll">
-        <ng-template pTemplate="header">
-          <tr>
-            <th>Received</th>
-            <th>Sender</th>
-            <th>Body</th>
-            <th>Status</th>
-            <th>Error</th>
-            <th style="width: 14rem">Actions</th>
-          </tr>
-        </ng-template>
-        <ng-template pTemplate="body" let-message>
-          <tr>
-            <td>{{ message.receivedAt | date:'short' }}</td>
-            <td>{{ message.sender }}</td>
-            <td class="truncate-column">{{ message.body }}</td>
-            <td><p-tag [value]="message.parseStatus" [severity]="message.parseStatus === 'Pending' ? 'warn' : message.parseStatus === 'Parsed' ? 'success' : 'danger'"></p-tag></td>
-            <td>{{ message.errorMessage || '-' }}</td>
-            <td>
-              <div class="flex flex-wrap gap-2">
-                <p-button label="Preview" icon="pi pi-eye" size="small" [text]="true" (onClick)="openPreview(message)"></p-button>
-                <p-button label="Reprocess" icon="pi pi-refresh" size="small" [text]="true" (onClick)="reprocess(message)"></p-button>
-                <p-button icon="pi pi-trash" size="small" [text]="true" severity="danger" (onClick)="deleteMessage(message)"></p-button>
-              </div>
-            </td>
-          </tr>
-        </ng-template>
-      </p-table>
+      @if (messages().length) {
+        <p-table [value]="messages()" responsiveLayout="scroll">
+          <ng-template pTemplate="header">
+            <tr>
+              <th>Received</th>
+              <th>Sender</th>
+              <th>Body</th>
+              <th>Status</th>
+              <th>Error</th>
+              <th style="width: 14rem">Actions</th>
+            </tr>
+          </ng-template>
+          <ng-template pTemplate="body" let-message>
+            <tr>
+              <td>{{ message.receivedAt | date:'short' }}</td>
+              <td>{{ message.sender }}</td>
+              <td class="truncate-column">{{ message.body }}</td>
+              <td><p-tag [value]="message.parseStatus" [severity]="message.parseStatus === 'Pending' ? 'warn' : message.parseStatus === 'Parsed' ? 'success' : 'danger'"></p-tag></td>
+              <td>{{ message.errorMessage || '-' }}</td>
+              <td>
+                <div class="flex flex-wrap gap-2">
+                  <p-button label="Preview" icon="pi pi-eye" size="small" [text]="true" (onClick)="openPreview(message)"></p-button>
+                  <p-button label="Reprocess" icon="pi pi-refresh" size="small" [text]="true" (onClick)="reprocess(message)"></p-button>
+                  <p-button icon="pi pi-trash" size="small" [text]="true" severity="danger" (onClick)="deleteMessage(message)"></p-button>
+                </div>
+              </td>
+            </tr>
+          </ng-template>
+        </p-table>
+      } @else {
+        <div class="empty-state empty-state--success text-center text-color-secondary">
+          <i class="pi pi-check-circle"></i>
+          <span>No parse failures. All recent SMS were processed cleanly.</span>
+        </div>
+      }
     </p-card>
 
     <p-dialog [(visible)]="previewVisible" [modal]="true" [style]="{ width: 'min(42rem, 96vw)' }" header="Raw message preview">
@@ -121,6 +128,24 @@ const PARSE_FAILURES_FALLBACK: RawMessage[] = [
       font-size: 0.875rem;
       color: var(--text-color-secondary);
       margin-bottom: 0.35rem;
+    }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 2rem 0.75rem;
+      color: var(--text-color-secondary);
+    }
+
+    .empty-state i {
+      font-size: 1.1rem;
+    }
+
+    .empty-state--success i {
+      color: var(--green-500);
     }
   `]
 })

@@ -14,6 +14,7 @@ const INSIGHTS_FALLBACK: InsightsReport = {
   calendarHeatmap: [],
   dayOfWeekAverages: [],
   recurringTransactions: [],
+  subscriptionAnomalies: [],
   firstTimeMerchants: [],
   quietDays: []
 };
@@ -37,19 +38,26 @@ const INSIGHTS_FALLBACK: InsightsReport = {
 
       <div class="col-12 xl:col-6">
         <p-card header="Recurring transactions">
-          <p-table [value]="insights().recurringTransactions" responsiveLayout="scroll">
-            <ng-template pTemplate="header">
-              <tr><th>Merchant</th><th>Average</th><th>Latest</th><th>Status</th></tr>
-            </ng-template>
-            <ng-template pTemplate="body" let-item>
-              <tr>
-                <td>{{ item.merchant }}</td>
-                <td>{{ item.averageAmount | currency:'EUR' }}</td>
-                <td>{{ item.latestAmount | currency:'EUR' }}</td>
-                <td><p-tag [value]="item.isAnomaly ? 'Anomaly' : 'Stable'" [severity]="item.isAnomaly ? 'danger' : 'success'"></p-tag></td>
-              </tr>
-            </ng-template>
-          </p-table>
+          @if (insights().recurringTransactions.length) {
+            <p-table [value]="insights().recurringTransactions" responsiveLayout="scroll">
+              <ng-template pTemplate="header">
+                <tr><th>Merchant</th><th>Average</th><th>Latest</th><th>Status</th></tr>
+              </ng-template>
+              <ng-template pTemplate="body" let-item>
+                <tr>
+                  <td>{{ item.merchant }}</td>
+                  <td>{{ item.averageAmount | currency:'EUR' }}</td>
+                  <td>{{ item.latestAmount | currency:'EUR' }}</td>
+                  <td><p-tag [value]="item.isAnomaly ? 'Anomaly' : 'Stable'" [severity]="item.isAnomaly ? 'danger' : 'success'"></p-tag></td>
+                </tr>
+              </ng-template>
+            </p-table>
+          } @else {
+            <div class="empty-state text-center text-color-secondary">
+              <i class="pi pi-info-circle"></i>
+              <span>Detection improves with 3+ months of history.</span>
+            </div>
+          }
         </p-card>
       </div>
 
@@ -77,6 +85,21 @@ const INSIGHTS_FALLBACK: InsightsReport = {
   `,
   styles: [`
     .chart { width: 100%; height: 24rem; }
+
+    .empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      padding: 2rem 0.75rem;
+      color: var(--text-color-secondary);
+    }
+
+    .empty-state i {
+      font-size: 1rem;
+      opacity: 0.8;
+    }
   `]
 })
 export class InsightsComponent {
