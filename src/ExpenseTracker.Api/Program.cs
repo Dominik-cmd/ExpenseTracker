@@ -52,6 +52,7 @@ builder.Services.AddHttpClient("Anthropic");
 builder.Services.AddHttpClient("Gemini");
 builder.Services.AddHostedService<SmsProcessingBackgroundService>();
 builder.Services.AddHostedService<NarrativeRegenerationWorker>();
+builder.Services.AddHostedService<DailyNarrativeWorker>();
 
 var keyPath = Environment.GetEnvironmentVariable("DATA_PROTECTION_KEY_PATH")
     ?? Path.Combine(builder.Environment.ContentRootPath, "data-protection-keys");

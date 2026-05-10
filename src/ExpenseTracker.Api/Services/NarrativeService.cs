@@ -32,6 +32,8 @@ public sealed class NarrativeService(
         - Compute or estimate numbers not provided in the input
         - Add suggestions or financial advice
         - Speculate about reasons for spending changes unless the input includes context
+
+        Output is one sentence only. Stop after the first period.
         """;
 
     public async Task<NarrativeResponse?> GetDashboardNarrativeAsync(Guid userId, CancellationToken ct)
@@ -180,7 +182,7 @@ public sealed class NarrativeService(
         var previousMonthStart = currentMonthStart.AddMonths(-1);
         var previousMonthComparableDays = Math.Min(daysElapsed, DateTime.DaysInMonth(previousMonthStart.Year, previousMonthStart.Month));
         var previousMonthSamePeriodEnd = previousMonthStart.AddDays(previousMonthComparableDays).AddTicks(-1);
-        var previousMtdSpend = spending
+        var sameDaysLastMonth = spending
             .Where(transaction => transaction.TransactionDate >= previousMonthStart && transaction.TransactionDate <= previousMonthSamePeriodEnd)
             .Sum(transaction => transaction.Amount);
 
@@ -218,7 +220,7 @@ public sealed class NarrativeService(
             daysElapsed,
             daysInMonth,
             mtdSpend,
-            previousMtdSpend,
+            sameDaysLastMonth,
             projectedMonthEnd,
             lastMonthTotal,
             sameMonthLastYear > 0 ? sameMonthLastYear : null,
@@ -364,24 +366,33 @@ public sealed class NarrativeService(
 
     private static string BuildDashboardPrompt(DashboardNarrativeInput input) =>
         $"""
-        Summarize how the user's spending is going right now.
+        Write ONE sentence (max 15 words) describing how this month's spending is going.
+
+        Style requirements:
+        - Lead with the takeaway, not the math
+        - Don't start with "Your spending is" or "This month is" — start with the observation
+        - Reference one specific number or merchant only if it carries the meaning
+        - Match the tone of these examples:
+          - "Tracking 12% above usual; one big insurance payment is the cause."
+          - "Quiet month so far — €566 spent, normal daily pace."
+          - "On pace for a high month; dining and travel running hot."
+          - "Below normal — last month's insurance bill is gone, baseline spending is steady."
+          - "Tracking normally."
 
         Input data:
         - Today: {input.Today}
         - Days into current month: {input.DayOfMonth} of {input.DaysInMonth}
         - Month-to-date spend: €{input.MtdSpend:F0}
-        - Same days of previous month: €{input.PreviousMtdSpend:F0}
-        - Projected month-end spend (linear pace): €{input.ProjectedMonthEnd:F0}
+        - Same days last month: €{input.SameDaysLastMonth:F0}
+        - Projected month-end: €{input.ProjectedMonthEnd:F0}
         - Last full month total: €{input.LastMonthTotal:F0}
-        - Same month previous year total: {(input.SameMonthLastYear.HasValue ? $"€{input.SameMonthLastYear.Value:F0}" : "no data")}
         - 30-day rolling spend: €{input.Rolling30Spend:F0}
         - 30-day rolling income: €{input.Rolling30Income:F0}
-        - Net flow 30d: €{input.Net30:F0}
         - Top spending category MTD: {input.TopCategory} (€{input.TopCategoryAmount:F0})
         - Largest single transaction last 30d: {input.LargestMerchant} €{input.LargestAmount:F0} ({input.LargestCategory})
-        - Number of transactions last 30d: {input.TxnCount}
+        - Transactions last 30d: {input.TxnCount}
 
-        Focus on: are they on track, what changed, is anything unusual. 1-2 sentences.
+        Output: ONE sentence. No greeting, no padding, no second sentence.
         """;
 
     private static string BuildMonthlyPrompt(MonthlyNarrativeInput input, int year, int month) =>
@@ -435,7 +446,7 @@ internal record DashboardNarrativeInput(
     int DayOfMonth,
     int DaysInMonth,
     decimal MtdSpend,
-    decimal PreviousMtdSpend,
+    decimal SameDaysLastMonth,
     decimal ProjectedMonthEnd,
     decimal LastMonthTotal,
     decimal? SameMonthLastYear,

@@ -5,14 +5,16 @@ namespace ExpenseTracker.Api.Models
 {
 
 
+public sealed record DashboardStrip(
+    decimal MonthToDate,
+    decimal OnPace,
+    decimal NetLast30,
+    decimal NetLast30Income,
+    decimal NetLast30Spending);
+
 public sealed record DashboardResponse(
-    DashboardKpi Kpi,
-    List<CategoryBreakdown> CategoryBreakdown,
-    List<CategoryComparison> CategoryComparisons,
-    List<DailySpending> DailySpending,
-    List<TopMerchant> TopMerchants,
+    List<CategoryBreakdown> CategoryLeaderboard,
     List<TransactionDto> RecentTransactions,
-    YtdWidget Ytd,
     IncomeWidget? Income);
 
 public sealed record DashboardKpi(

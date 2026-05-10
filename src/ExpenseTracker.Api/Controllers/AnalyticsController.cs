@@ -15,6 +15,36 @@ namespace ExpenseTracker.Api.Controllers
 [Route("api/analytics")]
 public sealed class AnalyticsController(AppDbContext dbContext, ILogger<AnalyticsController> logger) : ApiControllerBase
 {
+    [HttpGet("dashboard/strip")]
+    public async Task<ActionResult<DashboardStrip>> GetDashboardStripAsync(CancellationToken ct)
+    {
+        try
+        {
+            var transactions = await LoadTransactionsAsync(ct);
+            if (transactions is null) return Unauthorized();
+
+            var now = DateTime.UtcNow;
+            var spending = transactions.Where(x => x.Direction == Direction.Debit && !IsExcludedFromExpenses(x)).ToList();
+            var income = transactions.Where(x => x.Direction == Direction.Credit).ToList();
+            var currentMonthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
+            var monthToDate = SumBetween(spending, currentMonthStart, now);
+            var daysElapsed = Math.Max(1, (now.Date - currentMonthStart.Date).Days + 1);
+            var daysInMonth = DateTime.DaysInMonth(now.Year, now.Month);
+            var onPace = Math.Round((monthToDate / daysElapsed * daysInMonth) / 10m) * 10m;
+            var last30Start = now.Date.AddDays(-29);
+            var netLast30Income = SumBetween(income, last30Start, now);
+            var netLast30Spending = SumBetween(spending, last30Start, now);
+            var netLast30 = netLast30Income - netLast30Spending;
+
+            return Ok(new DashboardStrip(monthToDate, onPace, netLast30, netLast30Income, netLast30Spending));
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to fetch dashboard strip analytics.");
+            return Problem(statusCode: StatusCodes.Status500InternalServerError, title: "Unable to fetch dashboard strip analytics.");
+        }
+    }
+
     [HttpGet("dashboard")]
     public async Task<ActionResult<DashboardResponse>> GetDashboardAsync(CancellationToken ct)
     {
@@ -24,73 +54,15 @@ public sealed class AnalyticsController(AppDbContext dbContext, ILogger<Analytic
             if (transactions is null) return Unauthorized();
 
             var now = DateTime.UtcNow;
-            var spending = transactions.Where(x => x.Direction == Direction.Debit && !IsExcludedFromExpenses(x)).ToList();
-            var last30Start = now.Date.AddDays(-29);
-            var prev30Start = last30Start.AddDays(-30);
-            var prev30End = last30Start.AddDays(-1);
             var currentMonthStart = new DateTime(now.Year, now.Month, 1, 0, 0, 0, DateTimeKind.Utc);
-
-            var currentMonth = SumBetween(spending, currentMonthStart, now);
-            var last30 = SumBetween(spending, last30Start, now);
-            var prev30 = SumBetween(spending, prev30Start, prev30End);
-            var percentChange = prev30 == 0 ? 0 : Math.Round(((last30 - prev30) / prev30) * 100, 2);
-            var daysElapsed = Math.Max(1, (now.Date - currentMonthStart.Date).Days + 1);
-            var daysInMonth = DateTime.DaysInMonth(now.Year, now.Month);
-            var projectedMonthEnd = Math.Round((currentMonth / daysElapsed * daysInMonth) / 10m) * 10m;
-            var sameMonthLastYearStart = currentMonthStart.AddYears(-1);
-            var sameMonthLastYearEndDay = Math.Min(now.Day, DateTime.DaysInMonth(now.Year - 1, now.Month));
-            var sameMonthLastYearEnd = new DateTime(now.Year - 1, now.Month, sameMonthLastYearEndDay, 0, 0, 0, DateTimeKind.Utc)
-                .AddDays(1)
-                .AddTicks(-1);
-            var sameMonthLastYearAmount = SumBetween(spending, sameMonthLastYearStart, sameMonthLastYearEnd);
-            decimal? sameMonthLastYear = sameMonthLastYearAmount == 0 ? null : sameMonthLastYearAmount;
-            var incomeWidget = BuildIncomeWidget(transactions, now);
-            var income30d = incomeWidget.Last30Days;
-            var spending30d = last30;
-            var netFlow30d = incomeWidget.NetLast30Days;
-
-            var last30Transactions = spending.Where(x => x.TransactionDate >= last30Start && x.TransactionDate <= now).ToList();
-            var currentMonthTransactions = spending.Where(x => x.TransactionDate >= currentMonthStart && x.TransactionDate <= now).ToList();
-            var previousMonthStart = currentMonthStart.AddMonths(-1);
-            var previousMonthEnd = currentMonthStart.AddTicks(-1);
-            var previousMonthTransactions = spending.Where(x => x.TransactionDate >= previousMonthStart && x.TransactionDate <= previousMonthEnd).ToList();
-            var currentMonthCategoryTotals = currentMonthTransactions
-                .GroupBy(GetCategoryKey)
-                .ToDictionary(group => group.Key, group => group.Sum(x => x.Amount));
-            var previousMonthCategoryTotals = previousMonthTransactions
-                .GroupBy(GetCategoryKey)
-                .ToDictionary(group => group.Key, group => group.Sum(x => x.Amount));
-            var categoryComparisons = currentMonthCategoryTotals.Keys
-                .Union(previousMonthCategoryTotals.Keys)
-                .Select(categoryName =>
-                {
-                    var currentAmount = currentMonthCategoryTotals.GetValueOrDefault(categoryName);
-                    var previousAmount = previousMonthCategoryTotals.GetValueOrDefault(categoryName);
-                    var deltaAmount = currentAmount - previousAmount;
-                    var deltaPercent = previousAmount == 0 ? 0 : Math.Round((deltaAmount / previousAmount) * 100, 2);
-                    return new CategoryComparison(categoryName, currentAmount, previousAmount, deltaAmount, deltaPercent);
-                })
-                .OrderByDescending(x => Math.Abs(x.DeltaAmount))
-                .ThenByDescending(x => x.CurrentAmount)
-                .Take(8)
+            var currentMonthTransactions = transactions
+                .Where(x => x.Direction == Direction.Debit && !IsExcludedFromExpenses(x) && x.TransactionDate >= currentMonthStart && x.TransactionDate <= now)
                 .ToList();
 
-            var response = new DashboardResponse(
-                new DashboardKpi(currentMonth, last30, prev30, percentChange, projectedMonthEnd, sameMonthLastYear, netFlow30d, income30d, spending30d),
-                BuildCategoryBreakdown(last30Transactions),
-                categoryComparisons,
-                BuildDailySpending(last30Transactions, last30Start.Date, now.Date),
-                last30Transactions.Where(x => !string.IsNullOrWhiteSpace(x.MerchantNormalized))
-                    .GroupBy(x => x.MerchantNormalized)
-                    .Select(x => new TopMerchant(x.Key, x.Sum(y => y.Amount), x.Count()))
-                    .OrderByDescending(x => x.TotalAmount)
-                    .Take(10)
-                    .ToList(),
-                transactions.OrderByDescending(x => x.TransactionDate).ThenByDescending(x => x.CreatedAt).Take(10).Select(x => x.ToDto()).ToList(),
-                BuildYtdWidget(spending, now),
-                incomeWidget);
-
-            return Ok(response);
+            return Ok(new DashboardResponse(
+                BuildCategoryBreakdown(currentMonthTransactions),
+                transactions.OrderByDescending(x => x.TransactionDate).ThenByDescending(x => x.CreatedAt).Take(15).Select(x => x.ToDto()).ToList(),
+                BuildIncomeWidget(transactions, now)));
         }
         catch (Exception ex)
         {
@@ -107,10 +79,14 @@ public sealed class AnalyticsController(AppDbContext dbContext, ILogger<Analytic
             var transactions = await LoadTransactionsAsync(ct);
             if (transactions is null) return Unauthorized();
 
+            var now = DateTime.UtcNow;
             var start = new DateTime(year, month, 1, 0, 0, 0, DateTimeKind.Utc);
-            var end = start.AddMonths(1).AddTicks(-1);
+            var isCurrentMonth = year == now.Year && month == now.Month;
+            var end = isCurrentMonth ? now : start.AddMonths(1).AddTicks(-1);
             var prevStart = start.AddMonths(-1);
-            var prevEnd = start.AddTicks(-1);
+            var prevEnd = isCurrentMonth
+                ? prevStart.AddDays((now.Date - start.Date).Days).AddDays(1).AddTicks(-1)
+                : start.AddTicks(-1);
             var current = transactions.Where(x => x.Direction == Direction.Debit && !IsExcludedFromExpenses(x) && x.TransactionDate >= start && x.TransactionDate <= end).ToList();
             var previous = transactions.Where(x => x.Direction == Direction.Debit && !IsExcludedFromExpenses(x) && x.TransactionDate >= prevStart && x.TransactionDate <= prevEnd).ToList();
             var total = current.Sum(x => x.Amount);

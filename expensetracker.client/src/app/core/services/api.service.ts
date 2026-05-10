@@ -228,14 +228,17 @@ export interface YtdWidget {
 }
 
 export interface DashboardAnalytics {
-  kpi: DashboardKpi;
-  categoryBreakdown: CategoryBreakdown[];
-  categoryComparisons: CategoryComparison[];
-  dailySpending: DailySpending[];
-  topMerchants: TopMerchant[];
+  categoryLeaderboard: CategoryBreakdown[];
   recentTransactions: Transaction[];
-  ytd: YtdWidget;
-  income?: IncomeWidget | null;
+  income: IncomeWidget | null;
+}
+
+export interface DashboardStrip {
+  monthToDate: number;
+  onPace: number;
+  netLast30: number;
+  netLast30Income: number;
+  netLast30Spending: number;
 }
 
 export interface NarrativeResponse {
@@ -528,6 +531,10 @@ export class ApiService {
 
   getDashboardAnalytics(): Observable<DashboardAnalytics> {
     return this.http.get<DashboardAnalytics>(buildApiUrl('/api/analytics/dashboard'));
+  }
+
+  getDashboardStrip(): Observable<DashboardStrip> {
+    return this.http.get<DashboardStrip>(buildApiUrl('/api/analytics/dashboard/strip'));
   }
 
   getDashboardNarrative(): Observable<NarrativeResponse | null> {

@@ -3,6 +3,7 @@ using System.Text.Json;
 using ExpenseTracker.Api.Models;
 using ExpenseTracker.Api.Services;
 using ExpenseTracker.Core.Entities;
+using ExpenseTracker.Core.Enums;
 
 namespace ExpenseTracker.IntegrationTests;
 
@@ -24,12 +25,33 @@ public sealed class AnalyticsTests(CustomWebApplicationFactory factory) : Integr
 
     var payload = await ReadAsAsync<DashboardResponse>(response);
     Assert.NotNull(payload);
-    Assert.True(payload!.Kpi.Last30Days > 0);
-    Assert.NotEmpty(payload.CategoryBreakdown);
-    Assert.NotEmpty(payload.DailySpending);
-    Assert.NotEmpty(payload.TopMerchants);
+    Assert.NotEmpty(payload!.CategoryLeaderboard);
     Assert.NotEmpty(payload.RecentTransactions);
-    Assert.True(payload.Ytd.Total > 0);
+    Assert.NotNull(payload.Income);
+  }
+
+  [Fact]
+  public async Task GetDashboardStrip_ReturnsAggregates()
+  {
+    var groceriesId = await GetCategoryIdAsync("Groceries");
+    var fuelId = await GetCategoryIdAsync("Fuel");
+    var incomeId = await GetCategoryIdAsync("Income");
+    await SeedTransactionAsync(groceriesId, 15.40m, "MERCATOR", DateTime.UtcNow.AddDays(-1));
+    await SeedTransactionAsync(fuelId, 54.10m, "PETROL", DateTime.UtcNow.AddDays(-8));
+    await SeedTransactionAsync(incomeId, 500m, "EMPLOYER", DateTime.UtcNow.AddDays(-3), Direction.Credit, TransactionType.TransferIn);
+    var client = await CreateAuthenticatedClientAsync();
+
+    var response = await client.GetAsync("/api/analytics/dashboard/strip");
+
+    Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+
+    var payload = await ReadAsAsync<DashboardStrip>(response);
+    Assert.NotNull(payload);
+    Assert.True(payload!.MonthToDate > 0);
+    Assert.True(payload.OnPace > 0);
+    Assert.Equal(500m, payload.NetLast30Income);
+    Assert.True(payload.NetLast30Spending > 0);
+    Assert.Equal(payload.NetLast30Income - payload.NetLast30Spending, payload.NetLast30);
   }
 
   [Fact]

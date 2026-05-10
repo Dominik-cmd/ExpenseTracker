@@ -59,7 +59,6 @@ public sealed class SmsProcessingBackgroundService(
         var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var parser = scope.ServiceProvider.GetRequiredService<OtpBankaSmsParser>();
         var providerResolver = scope.ServiceProvider.GetRequiredService<ILlmProviderResolver>();
-        var narrativeChannel = scope.ServiceProvider.GetRequiredService<Channel<NarrativeRegenerationRequest>>();
 
         var rawMessage = await dbContext.RawMessages
             .Include(x => x.Transactions)
@@ -123,11 +122,6 @@ public sealed class SmsProcessingBackgroundService(
             }
 
             await dbContext.SaveChangesAsync(ct);
-
-            var transactionDate = transaction.TransactionDate;
-            await narrativeChannel.Writer.WriteAsync(new NarrativeRegenerationRequest(userId, "dashboard", "current"), ct);
-            await narrativeChannel.Writer.WriteAsync(new NarrativeRegenerationRequest(userId, "monthly", $"{transactionDate.Year}-{transactionDate.Month:D2}", transactionDate.Year, transactionDate.Month), ct);
-            await narrativeChannel.Writer.WriteAsync(new NarrativeRegenerationRequest(userId, "yearly", transactionDate.Year.ToString(), transactionDate.Year), ct);
         }
         catch (Exception ex)
         {
