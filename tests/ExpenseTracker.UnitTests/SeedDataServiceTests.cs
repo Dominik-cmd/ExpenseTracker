@@ -24,7 +24,8 @@ public sealed class SeedDataServiceTests
         categories.Should().ContainSingle(x => x.Name == "Income" && x.ParentCategoryId == null && x.IsSystem);
         categories.Should().ContainSingle(x => x.Name == "Uncategorized" && x.ParentCategoryId == null && x.IsSystem);
         categories.Should().ContainSingle(x => x.Name == "Mercator" && x.ParentCategoryId == groceries.Id);
-        categories.Should().HaveCount(29);
+        categories.Should().ContainSingle(x => x.Name == "Misc Income" && x.ParentCategoryId != null);
+        categories.Should().HaveCount(30);
         (await dbContext.LlmProviders.CountAsync()).Should().Be(3);
         (await dbContext.Settings.CountAsync()).Should().Be(2);
     }
@@ -39,7 +40,7 @@ public sealed class SeedDataServiceTests
         await service.SeedAsync();
 
         (await dbContext.Users.CountAsync()).Should().Be(1);
-        (await dbContext.Categories.CountAsync()).Should().Be(29);
+        (await dbContext.Categories.CountAsync()).Should().Be(30);
         (await dbContext.LlmProviders.CountAsync()).Should().Be(3);
         (await dbContext.Settings.CountAsync()).Should().Be(2);
     }

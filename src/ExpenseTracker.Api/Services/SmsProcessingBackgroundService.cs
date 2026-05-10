@@ -146,7 +146,8 @@ public sealed class SmsProcessingBackgroundService(
                 rule.HitCount += 1;
                 rule.LastHitAt = DateTime.UtcNow;
                 rule.UpdatedAt = DateTime.UtcNow;
-                return new CategoryResolution(rule.Category, CategorySource.Rule, false);
+                var resolution = new CategoryResolution(rule.Category, CategorySource.Rule, false);
+                return await ApplyMiscIncomeRedirectAsync(dbContext, resolution, parsed, userId, ct);
             }
         }
 
@@ -166,13 +167,65 @@ public sealed class SmsProcessingBackgroundService(
                 var category = await ResolveCategoryResultAsync(dbContext, result, userId, ct);
                 if (category is not null)
                 {
-                    return new CategoryResolution(category, CategorySource.Llm, !string.Equals(category.Name, "Uncategorized", StringComparison.OrdinalIgnoreCase));
+                    var resolution = new CategoryResolution(category, CategorySource.Llm, !string.Equals(category.Name, "Uncategorized", StringComparison.OrdinalIgnoreCase));
+                    return await ApplyMiscIncomeRedirectAsync(dbContext, resolution, parsed, userId, ct);
                 }
             }
         }
 
         var fallback = await dbContext.Categories.FirstAsync(x => x.UserId == userId && x.Name == "Uncategorized" && x.ParentCategoryId == null, ct);
         return new CategoryResolution(fallback, CategorySource.Default, false);
+    }
+
+    private const decimal MiscIncomeThreshold = 100m;
+
+    private static async Task<CategoryResolution> ApplyMiscIncomeRedirectAsync(
+        AppDbContext dbContext, CategoryResolution resolution, ParsedSms parsed, Guid userId, CancellationToken ct)
+    {
+        // Only redirect Credit transactions below the threshold
+        if (parsed.Direction != Direction.Credit || parsed.Amount >= MiscIncomeThreshold)
+            return resolution;
+
+        // Determine if the resolved category is "Income" or any subcategory of it
+        Category? incomeParent = null;
+        if (resolution.Category.ParentCategoryId == null)
+        {
+            if (string.Equals(resolution.Category.Name, "Income", StringComparison.OrdinalIgnoreCase))
+                incomeParent = resolution.Category;
+        }
+        else
+        {
+            var parent = await dbContext.Categories
+                .FirstOrDefaultAsync(x => x.Id == resolution.Category.ParentCategoryId.Value, ct);
+            if (parent is not null && string.Equals(parent.Name, "Income", StringComparison.OrdinalIgnoreCase))
+                incomeParent = parent;
+        }
+
+        if (incomeParent is null)
+            return resolution;
+
+        // Find or lazily create "Misc Income" under "Income"
+        var miscIncome = await dbContext.Categories.FirstOrDefaultAsync(
+            x => x.UserId == userId && x.Name == "Misc Income" && x.ParentCategoryId == incomeParent.Id, ct);
+
+        if (miscIncome is null)
+        {
+            miscIncome = new Category
+            {
+                UserId = userId,
+                Name = "Misc Income",
+                ParentCategoryId = incomeParent.Id,
+                Color = "#f472b6",
+                SortOrder = 99,
+                IsSystem = false,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+            dbContext.Categories.Add(miscIncome);
+            await dbContext.SaveChangesAsync(ct);
+        }
+
+        return new CategoryResolution(miscIncome, resolution.Source, false);
     }
 
     private static async Task<Category?> ResolveCategoryResultAsync(AppDbContext dbContext, CategorizationResult result, Guid userId, CancellationToken ct)

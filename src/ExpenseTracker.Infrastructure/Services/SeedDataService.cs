@@ -248,6 +248,21 @@ public sealed class SeedDataService : IHostedService
             )
             AND parent_category_id IS NULL;
             """, cancellationToken);
+
+        // Ensure "Misc Income" subcategory exists under "Income" for all users
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            INSERT INTO categories (id, user_id, name, parent_category_id, color, sort_order, is_system, exclude_from_expenses, exclude_from_income, created_at, updated_at)
+            SELECT gen_random_uuid(), income.user_id, 'Misc Income', income.id, '#f472b6', 99, false, false, false, NOW(), NOW()
+            FROM categories income
+            WHERE income.name = 'Income'
+              AND income.parent_category_id IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM categories c
+                WHERE c.user_id = income.user_id
+                  AND c.name = 'Misc Income'
+                  AND c.parent_category_id = income.id
+              );
+            """, cancellationToken);
     }
 
     private async Task<User?> SeedUserAsync(string initialPassword, CancellationToken cancellationToken)
@@ -319,17 +334,18 @@ public sealed class SeedDataService : IHostedService
             existingCategories[(definition.Name, null)] = category;
         }
 
-        var subcategoryDefinitions = new (string Parent, string Name, int SortOrder)[]
+        var subcategoryDefinitions = new (string Parent, string Name, int SortOrder, string? Color)[]
         {
-            ("Groceries", "Mercator", 1),
-            ("Groceries", "Hofer", 2),
-            ("Groceries", "Lidl", 3),
-            ("Groceries", "Spar", 4),
-            ("Groceries", "Tus", 5),
-            ("Fuel", "Petrol", 1),
-            ("Fuel", "OMV", 2),
-            ("Subscriptions", "Netflix", 1),
-            ("Subscriptions", "Spotify", 2)
+            ("Groceries", "Mercator", 1, null),
+            ("Groceries", "Hofer",    2, null),
+            ("Groceries", "Lidl",     3, null),
+            ("Groceries", "Spar",     4, null),
+            ("Groceries", "Tus",      5, null),
+            ("Fuel",      "Petrol",   1, null),
+            ("Fuel",      "OMV",      2, null),
+            ("Subscriptions", "Netflix", 1, null),
+            ("Subscriptions", "Spotify", 2, null),
+            ("Income",    "Misc Income", 99, "#f472b6")
         };
 
         foreach (var definition in subcategoryDefinitions)
@@ -344,6 +360,7 @@ public sealed class SeedDataService : IHostedService
                 UserId = userId,
                 Name = definition.Name,
                 ParentCategoryId = parentCategory.Id,
+                Color = definition.Color,
                 SortOrder = definition.SortOrder
             };
 
