@@ -21,7 +21,8 @@ const MONTHLY_FALLBACK: MonthlyReport = {
   rolling3MonthAverage: 0,
   categoryComparisons: [],
   dailySpending: [],
-  topMerchants: []
+  topMerchants: [],
+  dailyCategoryBreakdown: []
 };
 
 @Component({
@@ -54,27 +55,31 @@ const MONTHLY_FALLBACK: MonthlyReport = {
         </div>
       </p-card>
 
-      <div class="grid">
-        <div class="col-12 xl:col-7">
-          <p-card header="Daily spend">
+      <div class="grid charts-row">
+        <div class="col-12 xl:col-7 fill-col">
+          <p-card header="Daily spend" class="fill-card">
             <div echarts [options]="trendOptions()" class="chart"></div>
           </p-card>
         </div>
-        <div class="col-12 xl:col-5">
-          <p-card header="Category comparison">
-            <p-table [value]="report().categoryComparisons" responsiveLayout="scroll">
-              <ng-template pTemplate="header">
-                <tr><th>Category</th><th>Current</th><th>Previous</th><th>Delta</th></tr>
-              </ng-template>
-              <ng-template pTemplate="body" let-item>
-                <tr>
-                  <td>{{ item.name }}</td>
-                  <td>{{ item.currentAmount | currency:'EUR' }}</td>
-                  <td>{{ item.previousAmount | currency:'EUR' }}</td>
-                  <td>{{ item.deltaPercent }}%</td>
-                </tr>
-              </ng-template>
-            </p-table>
+        <div class="col-12 xl:col-5 fill-col">
+          <p-card header="Category comparison vs full previous month" class="fill-card">
+            <div class="table-scroll-wrapper">
+              <p-table [value]="report().categoryComparisons" responsiveLayout="scroll">
+                <ng-template pTemplate="header">
+                  <tr><th>Category</th><th>Current</th><th>Previous</th><th>Δ%</th></tr>
+                </ng-template>
+                <ng-template pTemplate="body" let-item>
+                  <tr>
+                    <td>{{ item.name }}</td>
+                    <td>{{ item.currentAmount | currency:'EUR' }}</td>
+                    <td>{{ item.previousAmount | currency:'EUR' }}</td>
+                    <td [style.color]="item.deltaPercent > 0 ? 'var(--red-400)' : item.deltaPercent < 0 ? 'var(--green-400)' : ''">
+                      {{ item.deltaPercent > 0 ? '+' : '' }}{{ item.deltaPercent }}%
+                    </td>
+                  </tr>
+                </ng-template>
+              </p-table>
+            </div>
           </p-card>
         </div>
       </div>
@@ -116,7 +121,25 @@ const MONTHLY_FALLBACK: MonthlyReport = {
       color: var(--yellow-500);
     }
 
-    .chart { width: 100%; height: 22rem; }
+    .charts-row { align-items: stretch; }
+
+    .fill-col { display: flex; flex-direction: column; }
+
+    :host ::ng-deep .fill-card,
+    :host ::ng-deep .fill-card .p-card,
+    :host ::ng-deep .fill-card .p-card-body,
+    :host ::ng-deep .fill-card .p-card-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    :host ::ng-deep .fill-card .p-card-content { padding-top: 0; }
+
+    .chart { width: 100%; height: 26rem; }
+
+    .table-scroll-wrapper { flex: 1; overflow-y: auto; max-height: 26rem; }
+
     .metric-label { color: var(--text-color-secondary); font-size: 0.875rem; }
     .metric-value { font-size: 1.35rem; font-weight: 600; margin-top: 0.35rem; }
   `]
@@ -130,17 +153,57 @@ export class MonthlyReportComponent {
   protected readonly narrative = signal<NarrativeResponse | null>(null);
 
   protected readonly trendOptions = computed<EChartsOption>(() => {
-    const points = this.report().dailySpending;
+    const daily = this.report().dailySpending;
+    const categoryData = this.report().dailyCategoryBreakdown;
+
+    // Build lookup: datePrefix (YYYY-MM-DD) -> categoryName -> amount
+    const categoryLookup = new Map<string, Map<string, number>>();
+    for (const entry of categoryData) {
+      const dateKey = entry.date.substring(0, 10);
+      if (!categoryLookup.has(dateKey)) categoryLookup.set(dateKey, new Map());
+      categoryLookup.get(dateKey)!.set(entry.categoryName, entry.amount);
+    }
+
+    // Unique ordered categories (order preserved from backend: highest total first)
+    const categories: { name: string; color: string }[] = [];
+    const seen = new Set<string>();
+    for (const entry of categoryData) {
+      if (!seen.has(entry.categoryName)) {
+        seen.add(entry.categoryName);
+        categories.push({ name: entry.categoryName, color: entry.color ?? '#94a3b8' });
+      }
+    }
+
+    const xLabels = daily.map(p => new Date(p.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }));
+    const datePrefixes = daily.map(p => p.date.substring(0, 10));
+
+    const barSeries: EChartsOption['series'] = categories.map(cat => ({
+      name: cat.name,
+      type: 'bar' as const,
+      stack: 'total',
+      emphasis: { focus: 'series' as const },
+      itemStyle: { color: cat.color },
+      data: datePrefixes.map(d => categoryLookup.get(d)?.get(cat.name) ?? 0)
+    }));
+
+    const rolling7dSeries: EChartsOption['series'] = [{
+      name: 'Rolling 7d avg',
+      type: 'line' as const,
+      smooth: true,
+      data: daily.map(p => p.rolling7Day ?? p.amount),
+      lineStyle: { width: 2, color: '#f97316' },
+      itemStyle: { color: '#f97316' },
+      symbol: 'none',
+      z: 10
+    }];
+
     return {
-      tooltip: { trigger: 'axis' },
-      legend: { top: 0 },
-      grid: { left: 24, right: 24, top: 48, bottom: 24, containLabel: true },
-      xAxis: { type: 'category', data: points.map((point) => new Date(point.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })) },
+      tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+      legend: { top: 0, type: 'scroll', textStyle: { fontSize: 11 } },
+      grid: { left: 24, right: 24, top: 56, bottom: 24, containLabel: true },
+      xAxis: { type: 'category', data: xLabels },
       yAxis: { type: 'value' },
-      series: [
-        { name: 'Daily spend', type: 'bar', data: points.map((point) => point.amount) },
-        { name: 'Rolling 7d', type: 'line', smooth: true, data: points.map((point) => point.rolling7Day ?? point.amount) }
-      ]
+      series: [...(barSeries as any[]), ...(rolling7dSeries as any[])]
     };
   });
 
@@ -174,5 +237,3 @@ export class MonthlyReportComponent {
     });
   }
 }
-
-

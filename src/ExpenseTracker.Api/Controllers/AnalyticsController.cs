@@ -87,8 +87,13 @@ public sealed class AnalyticsController(AppDbContext dbContext, ILogger<Analytic
             var prevEnd = isCurrentMonth
                 ? prevStart.AddDays((now.Date - start.Date).Days).AddDays(1).AddTicks(-1)
                 : start.AddTicks(-1);
+            // For category comparison always use the full previous month so numbers are comparable
+            var fullPrevEnd = start.AddTicks(-1);
             var current = transactions.Where(x => x.Direction == Direction.Debit && !IsExcludedFromExpenses(x) && x.TransactionDate >= start && x.TransactionDate <= end).ToList();
             var previous = transactions.Where(x => x.Direction == Direction.Debit && !IsExcludedFromExpenses(x) && x.TransactionDate >= prevStart && x.TransactionDate <= prevEnd).ToList();
+            var fullPrevious = isCurrentMonth
+                ? transactions.Where(x => x.Direction == Direction.Debit && !IsExcludedFromExpenses(x) && x.TransactionDate >= prevStart && x.TransactionDate <= fullPrevEnd).ToList()
+                : previous;
             var total = current.Sum(x => x.Amount);
             var previousTotal = previous.Sum(x => x.Amount);
             var percentChange = previousTotal == 0 ? 0 : Math.Round(((total - previousTotal) / previousTotal) * 100, 2);
@@ -103,11 +108,12 @@ public sealed class AnalyticsController(AppDbContext dbContext, ILogger<Analytic
                 .Select(group =>
                 {
                     var currentAmount = group.Sum(x => x.Amount);
-                    var previousAmount = previous.Where(x => GetCategoryKey(x) == group.Key).Sum(x => x.Amount);
+                    var previousAmount = fullPrevious.Where(x => GetCategoryKey(x) == group.Key).Sum(x => x.Amount);
                     var deltaPercent = previousAmount == 0 ? 0 : Math.Round(((currentAmount - previousAmount) / previousAmount) * 100, 2);
                     return new CategoryComparison(group.Key, currentAmount, previousAmount, currentAmount - previousAmount, deltaPercent);
                 })
                 .OrderByDescending(x => x.CurrentAmount)
+                .Take(10)
                 .ToList();
 
             return Ok(new MonthlyReportResponse(
@@ -124,7 +130,8 @@ public sealed class AnalyticsController(AppDbContext dbContext, ILogger<Analytic
                     .Select(x => new TopMerchant(x.Key, x.Sum(y => y.Amount), x.Count()))
                     .OrderByDescending(x => x.TotalAmount)
                     .Take(10)
-                    .ToList()));
+                    .ToList(),
+                BuildDailyCategorySpending(current, start.Date, end.Date)));
         }
         catch (Exception ex)
         {
@@ -378,6 +385,29 @@ public sealed class AnalyticsController(AppDbContext dbContext, ILogger<Analytic
             point.Amount,
             Math.Round(series.Skip(Math.Max(0, index - 6)).Take(Math.Min(index + 1, 7)).Average(x => x.Amount), 2),
             Math.Round(series.Skip(Math.Max(0, index - 29)).Take(Math.Min(index + 1, 30)).Average(x => x.Amount), 2)))
+            .ToList();
+    }
+
+    private static List<DailyCategorySpending> BuildDailyCategorySpending(List<Transaction> transactions, DateTime start, DateTime end, int topN = 10)
+    {
+        var topCategories = transactions
+            .GroupBy(x => new { Name = GetCategoryKey(x), Color = x.Category.ParentCategory?.Color ?? x.Category.Color })
+            .Select(g => new { g.Key.Name, g.Key.Color, Total = g.Sum(x => x.Amount) })
+            .OrderByDescending(x => x.Total)
+            .Take(topN)
+            .ToList();
+
+        var topCategoryNames = topCategories.Select(x => x.Name).ToHashSet();
+        var days = Enumerable.Range(0, Math.Max((end - start).Days + 1, 1))
+            .Select(offset => start.AddDays(offset).Date)
+            .ToList();
+        var lookup = transactions
+            .Where(x => topCategoryNames.Contains(GetCategoryKey(x)))
+            .GroupBy(x => (Date: x.TransactionDate.Date, Category: GetCategoryKey(x)))
+            .ToDictionary(g => g.Key, g => g.Sum(x => x.Amount));
+
+        return topCategories.SelectMany(cat => days.Select(day =>
+            new DailyCategorySpending(day, cat.Name, cat.Color, lookup.GetValueOrDefault((day, cat.Name)))))
             .ToList();
     }
 

@@ -45,9 +45,12 @@ public sealed record MonthlyReportResponse(
     decimal Rolling3MonthAverage,
     List<CategoryComparison> CategoryComparisons,
     List<DailySpending> DailySpending,
-    List<TopMerchant> TopMerchants);
+    List<TopMerchant> TopMerchants,
+    List<DailyCategorySpending> DailyCategoryBreakdown);
 
 public sealed record CategoryComparison(string Name, decimal CurrentAmount, decimal PreviousAmount, decimal DeltaAmount, decimal DeltaPercent);
+
+public sealed record DailyCategorySpending(DateTime Date, string CategoryName, string? Color, decimal Amount);
 
 public sealed record YearlyReportResponse(
     int Year,

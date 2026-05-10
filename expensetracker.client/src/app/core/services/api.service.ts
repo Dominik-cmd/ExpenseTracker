@@ -280,6 +280,13 @@ export interface CategoryComparison {
   deltaPercent: number;
 }
 
+export interface DailyCategorySpending {
+  date: string;
+  categoryName: string;
+  color: string | null;
+  amount: number;
+}
+
 export interface MonthlyReport {
   year: number;
   month: number;
@@ -290,6 +297,7 @@ export interface MonthlyReport {
   categoryComparisons: CategoryComparison[];
   dailySpending: DailySpending[];
   topMerchants: TopMerchant[];
+  dailyCategoryBreakdown: DailyCategorySpending[];
 }
 
 export interface MonthlyCategoryTotal {
