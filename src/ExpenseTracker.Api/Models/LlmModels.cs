@@ -10,7 +10,7 @@ public sealed record LlmProviderDto(
     string Name,
     string Model,
     bool IsEnabled,
-    bool HasApiKey,
+    string? ApiKey,
     DateTime? LastTestedAt,
     string? LastTestStatus);
 

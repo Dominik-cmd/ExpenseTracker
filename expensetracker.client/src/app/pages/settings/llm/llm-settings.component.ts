@@ -7,7 +7,6 @@ import { MessageService } from 'primeng/api';
 import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
 import { InputTextModule } from 'primeng/inputtext';
-import { PasswordModule } from 'primeng/password';
 import { TagModule } from 'primeng/tag';
 import { ToggleSwitchModule } from 'primeng/toggleswitch';
 
@@ -21,17 +20,17 @@ const PROVIDER_BLUEPRINTS = [
 
 const LLM_SETTINGS_FALLBACK: LlmSettings = {
   providers: [
-    { id: 'openai', providerType: 'OpenAi', name: 'OpenAI', model: 'gpt-4.1-mini', isEnabled: true, hasApiKey: true, lastTestedAt: new Date().toISOString(), lastTestStatus: 'Success' },
-    { id: 'anthropic', providerType: 'Anthropic', name: 'Anthropic', model: 'claude-sonnet-4.5', isEnabled: false, hasApiKey: false, lastTestedAt: null, lastTestStatus: null },
-    { id: 'gemini', providerType: 'Gemini', name: 'Google Gemini', model: 'gemini-2.0-flash', isEnabled: false, hasApiKey: false, lastTestedAt: null, lastTestStatus: null }
+    { id: 'openai', providerType: 'OpenAi', name: 'OpenAI', model: 'gpt-4.1-mini', isEnabled: true, apiKey: null, lastTestedAt: new Date().toISOString(), lastTestStatus: 'Success' },
+    { id: 'anthropic', providerType: 'Anthropic', name: 'Anthropic', model: 'claude-sonnet-4.5', isEnabled: false, apiKey: null, lastTestedAt: null, lastTestStatus: null },
+    { id: 'gemini', providerType: 'Gemini', name: 'Google Gemini', model: 'gemini-2.0-flash', isEnabled: false, apiKey: null, lastTestedAt: null, lastTestStatus: null }
   ],
-  activeProvider: { id: 'openai', providerType: 'OpenAi', name: 'OpenAI', model: 'gpt-4.1-mini', isEnabled: true, hasApiKey: true, lastTestedAt: new Date().toISOString(), lastTestStatus: 'Success' }
+  activeProvider: { id: 'openai', providerType: 'OpenAi', name: 'OpenAI', model: 'gpt-4.1-mini', isEnabled: true, apiKey: null, lastTestedAt: new Date().toISOString(), lastTestStatus: 'Success' }
 };
 
 @Component({
   standalone: true,
   selector: 'app-llm-settings',
-  imports: [CommonModule, FormsModule, ButtonModule, CardModule, InputTextModule, PasswordModule, TagModule, ToggleSwitchModule],
+  imports: [CommonModule, FormsModule, ButtonModule, CardModule, InputTextModule, TagModule, ToggleSwitchModule],
   template: `
     <div class="flex justify-content-end mb-3 gap-2">
       <p-button
@@ -62,7 +61,7 @@ const LLM_SETTINGS_FALLBACK: LlmSettings = {
           <div class="flex align-items-center justify-content-between gap-3 mb-3">
             <div class="flex flex-wrap gap-2">
               <p-tag [value]="provider.isEnabled ? 'Enabled' : 'Standby'" [severity]="provider.isEnabled ? 'success' : 'secondary'"></p-tag>
-              <p-tag [value]="provider.hasApiKey ? 'API key configured' : 'Missing API key'" [severity]="provider.hasApiKey ? 'success' : 'warn'"></p-tag>
+              <p-tag [value]="provider.apiKey ? 'API key configured' : 'Missing API key'" [severity]="provider.apiKey ? 'success' : 'warn'"></p-tag>
               <p-tag *ngIf="provider.lastTestStatus" [value]="provider.lastTestStatus"></p-tag>
             </div>
             <p-toggleSwitch [ngModel]="drafts[providerKey(provider)]?.isEnabled ?? provider.isEnabled" (ngModelChange)="toggleProvider(provider, $event)"></p-toggleSwitch>
@@ -76,17 +75,10 @@ const LLM_SETTINGS_FALLBACK: LlmSettings = {
 
             <div>
               <label class="field-label" [for]="provider.id + '-key'">API key</label>
-              <p-password
-                [inputId]="provider.id + '-key'"
-                [feedback]="false"
-                [toggleMask]="true"
+              <input [id]="provider.id + '-key'" type="text" pInputText
                 [ngModel]="drafts[providerKey(provider)].apiKey"
                 (ngModelChange)="updateDraft(provider, 'apiKey', $event)"
-                [placeholder]="provider.hasApiKey ? '••••••••  (key saved — enter new to replace)' : 'Paste API key…'">
-              </p-password>
-              <small *ngIf="provider.hasApiKey && !drafts[providerKey(provider)].apiKey" class="text-green-500 flex align-items-center gap-1 mt-1">
-                <i class="pi pi-check-circle"></i> API key is configured. Leave blank to keep it.
-              </small>
+                placeholder="Paste API key…" />
             </div>
 
             <small class="text-color-secondary">Last tested {{ provider.lastTestedAt ? (provider.lastTestedAt | date:'short') : 'not yet' }}</small>
@@ -167,7 +159,7 @@ export class LlmSettingsComponent {
       apiKey: draft.apiKey || undefined,
       isEnabled: draft.isEnabled
     }).pipe(
-      catchError(() => of({ ...provider, model: draft.model || provider.model, hasApiKey: provider.hasApiKey || Boolean(draft.apiKey), isEnabled: draft.isEnabled })),
+      catchError(() => of({ ...provider, model: draft.model || provider.model, apiKey: draft.apiKey || provider.apiKey, isEnabled: draft.isEnabled })),
       finalize(() => this.busyKey.set(null)),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe((updatedProvider) => {
@@ -184,7 +176,6 @@ export class LlmSettingsComponent {
           activeProvider: providers.find((p) => p.isEnabled) ?? null
         };
       });
-      this.updateDraft(updatedProvider, 'apiKey', '');
       this.messageService.add({ severity: 'success', summary: 'Provider saved', detail: `${provider.name} settings updated.` });
     });
   }
@@ -277,7 +268,7 @@ export class LlmSettingsComponent {
       name: blueprint.name,
       model: providerMap.get(blueprint.key)?.model ?? blueprint.defaultModel,
       isEnabled: providerMap.get(blueprint.key)?.isEnabled ?? false,
-      hasApiKey: providerMap.get(blueprint.key)?.hasApiKey ?? false,
+      apiKey: providerMap.get(blueprint.key)?.apiKey ?? null,
       lastTestedAt: providerMap.get(blueprint.key)?.lastTestedAt ?? null,
       lastTestStatus: providerMap.get(blueprint.key)?.lastTestStatus ?? null
     }));
@@ -289,6 +280,6 @@ export class LlmSettingsComponent {
   }
 
   private createDrafts(providers: LlmProvider[]): Record<string, { model: string; apiKey: string; isEnabled: boolean }> {
-    return Object.fromEntries(providers.map((provider) => [this.providerKey(provider), { model: provider.model, apiKey: '', isEnabled: provider.isEnabled }]));
+    return Object.fromEntries(providers.map((provider) => [this.providerKey(provider), { model: provider.model, apiKey: provider.apiKey ?? '', isEnabled: provider.isEnabled }]));
   }
 }

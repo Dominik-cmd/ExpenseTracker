@@ -9,12 +9,12 @@
   <!-- Persistent sidebar -->
   <aside class="app-sidebar" *ngIf="isAuthenticated()">
     <div class="sidebar-header">
-      <div class="sidebar-brand" *ngIf="!sidebarCollapsed()">
+      <div class="sidebar-brand" *ngIf="showSidebarLabels()">
         <div class="text-sm text-color-secondary">Signed in as</div>
         <div class="font-semibold">{{ username() }}</div>
       </div>
       <p-button
-        [icon]="sidebarCollapsed() ? 'pi pi-angle-right' : 'pi pi-angle-left'"
+        [icon]="isMobile() ? 'pi pi-times' : (sidebarCollapsed() ? 'pi pi-angle-right' : 'pi pi-angle-left')"
         [text]="true"
         severity="secondary"
         (onClick)="toggleSidebar()"></p-button>
@@ -23,7 +23,7 @@
     <nav class="nav-links">
       @for (group of navGroups(); track group.label) {
         <div class="nav-group">
-          @if (!sidebarCollapsed()) {
+          @if (showSidebarLabels()) {
             @if (group.collapsible) {
               <div class="nav-group-header" (click)="toggleSection(group.label)">
                 <span class="nav-group-label">{{ group.label }}</span>
@@ -43,9 +43,9 @@
                 routerLinkActive="active"
                 [routerLinkActiveOptions]="{ exact: true }"
                 class="nav-link"
-                [title]="sidebarCollapsed() ? item.label : ''">
+                [title]="showSidebarLabels() ? '' : item.label">
                 <i [class]="item.icon"></i>
-                @if (!sidebarCollapsed()) {
+                @if (showSidebarLabels()) {
                   <span class="nav-label">{{ item.label }}</span>
                 }
               </a>

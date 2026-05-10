@@ -1,5 +1,6 @@
 using ExpenseTracker.Api.Models;
 using ExpenseTracker.Core.Entities;
+using Microsoft.AspNetCore.DataProtection;
 
 namespace ExpenseTracker.Api.Services
 {
@@ -66,16 +67,22 @@ public static class ApiMappingExtensions
             message.Transactions.OrderByDescending(x => x.CreatedAt).Select(x => (Guid?)x.Id).FirstOrDefault(),
             message.CreatedAt);
 
-    public static LlmProviderDto ToDto(this LlmProvider provider)
+    public static LlmProviderDto ToDto(this LlmProvider provider, IDataProtector protector)
         => new(
             provider.Id,
             provider.ProviderType.ToString(),
             string.IsNullOrWhiteSpace(provider.Name) ? provider.ProviderType.ToString() : provider.Name,
             provider.Model,
             provider.IsEnabled,
-            !string.IsNullOrWhiteSpace(provider.ApiKeyEncrypted),
+            DecryptSafe(provider.ApiKeyEncrypted, protector),
             provider.LastTestedAt,
             provider.LastTestStatus?.ToString());
+    private static string? DecryptSafe(string? encrypted, IDataProtector protector)
+    {
+        if (string.IsNullOrWhiteSpace(encrypted)) return null;
+        try { return protector.Unprotect(encrypted); }
+        catch { return null; }
+    }
 }
 }
 

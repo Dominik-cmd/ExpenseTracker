@@ -12,8 +12,7 @@ public sealed class IbkrFlexClient(IHttpClientFactory httpClientFactory, IbkrRat
         var http = httpClientFactory.CreateClient("IbkrFlex");
 
         var requestUrl = $"{BaseUrl}/SendRequest?t={Uri.EscapeDataString(token)}&q={Uri.EscapeDataString(queryId)}&v=3";
-        var maskedToken = token.Length > 6 ? token[..4] + "***" + token[^2..] : "***";
-        logger.LogDebug("IBKR SendRequest → {Url}", $"{BaseUrl}/SendRequest?t={maskedToken}&q={queryId}&v=3");
+        logger.LogDebug("IBKR SendRequest → {Url}", requestUrl);
 
         var headers = http.DefaultRequestHeaders;
         logger.LogDebug("IBKR request headers — User-Agent: {UA}, Accept: {Accept}",

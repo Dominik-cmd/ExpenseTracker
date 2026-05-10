@@ -29,6 +29,7 @@ public sealed class InvestmentProvidersController(
         var userId = GetCurrentUserId();
         if (userId is null) return Unauthorized();
 
+        var protector = dataProtection.CreateProtector("InvestmentApiKeys");
         var providers = await dbContext.InvestmentProviders
             .AsNoTracking()
             .Where(p => p.UserId == userId.Value)
@@ -39,8 +40,8 @@ public sealed class InvestmentProvidersController(
             p.Id,
             providerType = p.ProviderType.ToString().ToLowerInvariant(),
             p.DisplayName,
-            hasToken = !string.IsNullOrEmpty(p.ApiTokenEncrypted),
-            extraConfig = p.ExtraConfig is not null ? MaskConfig(p.ExtraConfig) : null,
+            token = DecryptSafe(p.ApiTokenEncrypted, protector),
+            extraConfig = p.ExtraConfig is not null ? DeserializeConfig(p.ExtraConfig) : null,
             p.IsEnabled,
             p.LastSyncAt,
             p.LastSyncStatus,
@@ -147,16 +148,17 @@ public sealed class InvestmentProvidersController(
         return Ok();
     }
 
-    private static object? MaskConfig(string json)
+    private static string? DecryptSafe(string? encrypted, IDataProtector protector)
     {
-        try
-        {
-            return JsonSerializer.Deserialize<object>(json);
-        }
-        catch
-        {
-            return null;
-        }
+        if (string.IsNullOrWhiteSpace(encrypted)) return null;
+        try { return protector.Unprotect(encrypted); }
+        catch { return null; }
+    }
+
+    private static object? DeserializeConfig(string json)
+    {
+        try { return JsonSerializer.Deserialize<object>(json); }
+        catch { return null; }
     }
 }
 

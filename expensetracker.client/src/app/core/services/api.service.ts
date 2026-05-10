@@ -170,7 +170,7 @@ export interface LlmProvider {
   name: string;
   model: string;
   isEnabled: boolean;
-  hasApiKey: boolean;
+  apiKey: string | null;
   lastTestedAt?: string | null;
   lastTestStatus?: string | null;
 }
@@ -513,7 +513,7 @@ export interface InvestmentProvider {
   id: string;
   providerType: string;
   displayName: string;
-  hasToken: boolean;
+  token: string | null;
   extraConfig: any;
   isEnabled: boolean;
   lastSyncAt: string | null;

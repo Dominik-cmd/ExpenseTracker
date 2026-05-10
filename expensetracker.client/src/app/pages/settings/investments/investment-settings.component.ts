@@ -9,7 +9,6 @@ import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
 import { InputTextModule } from 'primeng/inputtext';
 import { MessageModule } from 'primeng/message';
-import { PasswordModule } from 'primeng/password';
 import { TagModule } from 'primeng/tag';
 import { ToggleSwitchModule } from 'primeng/toggleswitch';
 
@@ -25,7 +24,6 @@ import { ApiService, InvestmentProvider } from '../../../core/services/api.servi
     CardModule,
     ButtonModule,
     InputTextModule,
-    PasswordModule,
     ToggleSwitchModule,
     TagModule,
     AccordionModule,
@@ -64,7 +62,7 @@ import { ApiService, InvestmentProvider } from '../../../core/services/api.servi
             <div class="form-grid">
               <div class="field">
                 <label>Flex Token</label>
-                <p-password [(ngModel)]="ibkrToken" [toggleMask]="true" [feedback]="false" placeholder="Enter IBKR Flex token" styleClass="w-full" />
+                <input pInputText [(ngModel)]="ibkrToken" placeholder="Enter IBKR Flex token" class="w-full" />
               </div>
               <div class="field">
                 <label>Token expires</label>
@@ -233,6 +231,9 @@ export class InvestmentSettingsComponent {
         this.ibkrNavQuery = ibkr.extraConfig.navQueryId ?? '';
         this.ibkrTokenExpiry = ibkr.extraConfig.tokenExpiresAt ?? '';
       }
+      if (ibkr?.token) {
+        this.ibkrToken = ibkr.token;
+      }
 
       this.manualAccountCount.set(data.manualAccounts.length);
       this.manualTotal.set(data.manualAccounts.reduce((sum, account) => sum + (account.balance ?? 0), 0));
@@ -270,7 +271,6 @@ export class InvestmentSettingsComponent {
       .subscribe({
         next: () => {
           this.savingIbkr.set(false);
-          this.ibkrToken = '';
           this.loadProviders();
         },
         error: () => this.savingIbkr.set(false)

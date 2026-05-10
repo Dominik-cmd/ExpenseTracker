@@ -111,6 +111,7 @@ export class AppComponent {
   protected readonly isAuthenticated = this.authService.authenticated;
   protected readonly username = computed(() => this.authService.getUsername() ?? 'Expense user');
   protected readonly isMobile = signal(this.checkMobile());
+  protected readonly showSidebarLabels = computed(() => !this.sidebarCollapsed() || this.isMobile());
 
   constructor() {
     effect(() => {
@@ -170,7 +171,7 @@ export class AppComponent {
   }
 
   protected isSectionExpanded(group: NavGroup): boolean {
-    if (!group.collapsible || this.sidebarCollapsed()) {
+    if (!group.collapsible || !this.showSidebarLabels()) {
       return true;
     }
 

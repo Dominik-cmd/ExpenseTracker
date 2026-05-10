@@ -37,7 +37,7 @@ public sealed class LlmProvidersController(
             if (userId is null) return Unauthorized();
 
             var items = await dbContext.LlmProviders.AsNoTracking().Where(x => x.UserId == userId.Value).OrderBy(x => x.ProviderType).ToListAsync(ct);
-            return Ok(items.Select(x => x.ToDto()).ToList());
+            return Ok(items.Select(x => x.ToDto(_protector)).ToList());
         }
         catch (Exception ex)
         {
@@ -55,7 +55,7 @@ public sealed class LlmProvidersController(
             if (userId is null) return Unauthorized();
 
             var provider = await dbContext.LlmProviders.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && x.UserId == userId.Value, ct);
-            return provider is null ? NotFound() : Ok(provider.ToDto());
+            return provider is null ? NotFound() : Ok(provider.ToDto(_protector));
         }
         catch (Exception ex)
         {
@@ -107,7 +107,7 @@ public sealed class LlmProvidersController(
             AddAuditLog(provider.Id, "Patch", changes);
             await dbContext.SaveChangesAsync(ct);
             providerResolver.InvalidateCache();
-            return Ok(provider.ToDto());
+            return Ok(provider.ToDto(_protector));
         }
         catch (Exception ex)
         {
@@ -230,7 +230,7 @@ public sealed class LlmProvidersController(
             if (userId is null) return Unauthorized();
 
             var provider = await dbContext.LlmProviders.AsNoTracking().FirstOrDefaultAsync(x => x.UserId == userId.Value && x.IsEnabled, ct);
-            return Ok(provider?.ToDto());
+            return Ok(provider?.ToDto(_protector));
         }
         catch (Exception ex)
         {
