@@ -59,6 +59,7 @@ builder.Services.AddHostedService<DailyNarrativeWorker>();
 // Investment services
 builder.Services.AddScoped<InvestmentAnalyticsService>();
 builder.Services.AddScoped<PortfolioHistoryService>();
+builder.Services.AddSingleton<IbkrRateLimiter>();
 builder.Services.AddScoped<IbkrFlexClient>();
 builder.Services.AddScoped<IbkrFlexParser>();
 builder.Services.AddScoped<IbkrFlexProvider>();

@@ -3,7 +3,7 @@ using Microsoft.Extensions.Logging;
 
 namespace ExpenseTracker.Infrastructure.Investments.Ibkr;
 
-public sealed class IbkrFlexClient(IHttpClientFactory httpClientFactory, ILogger<IbkrFlexClient> logger)
+public sealed class IbkrFlexClient(IHttpClientFactory httpClientFactory, IbkrRateLimiter rateLimiter, ILogger<IbkrFlexClient> logger)
 {
     private const string BaseUrl = "https://ndcdyn.interactivebrokers.com/AccountManagement/FlexWebService";
 
@@ -24,6 +24,7 @@ public sealed class IbkrFlexClient(IHttpClientFactory httpClientFactory, ILogger
         string requestResponse = "";
         for (var sendAttempt = 0; sendAttempt < maxSendAttempts; sendAttempt++)
         {
+            await rateLimiter.WaitAsync(ct);
             requestResponse = await http.GetStringAsync(requestUrl, ct);
             logger.LogDebug("IBKR SendRequest response (attempt {Attempt}): {Body}", sendAttempt + 1, requestResponse);
             if (!IsTransientSendError(requestResponse))
@@ -41,6 +42,7 @@ public sealed class IbkrFlexClient(IHttpClientFactory httpClientFactory, ILogger
 
         for (var attempt = 0; attempt < maxAttempts; attempt++)
         {
+            await rateLimiter.WaitAsync(ct);
             var fetchUrl = $"{retrievalUrl}?q={Uri.EscapeDataString(referenceCode)}&t={Uri.EscapeDataString(token)}&v=3";
             var response = await http.GetStringAsync(fetchUrl, ct);
 
