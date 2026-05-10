@@ -83,7 +83,7 @@ const DASHBOARD_FALLBACK: DashboardAnalytics = {
       </div>
 
       <div class="col-12 xl:col-6 primary-widget">
-        <p-card header="Spending by category" subheader="Top categories this month">
+        <p-card header="Spending by category" subheader="Last 30 days · top 8 categories">
           <div echarts [options]="breakdownOptions()" class="chart category-chart"></div>
         </p-card>
       </div>
@@ -220,6 +220,28 @@ const DASHBOARD_FALLBACK: DashboardAnalytics = {
   styles: [`
     .dashboard-grid {
       row-gap: 1.25rem;
+    }
+
+    /* Make all col-* cells flex containers so p-card can fill the row height */
+    .dashboard-grid > * {
+      display: flex;
+      flex-direction: column;
+    }
+
+    :host ::ng-deep .dashboard-grid .p-card {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    :host ::ng-deep .dashboard-grid .p-card .p-card-body {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+    }
+
+    :host ::ng-deep .dashboard-grid .p-card .p-card-content {
+      flex: 1;
     }
 
     .chart {
@@ -439,6 +461,7 @@ export class DashboardComponent {
           show: true,
           position: 'right',
           fontSize: 11,
+          color: this.themeTextColor,
           formatter: (params: unknown) => {
             const point = params as { dataIndex: number };
             const item = reversed[point?.dataIndex ?? 0];
@@ -506,7 +529,7 @@ export class DashboardComponent {
               value: `€${Math.round(item.amount)}`,
               symbol: 'pin',
               symbolSize: 40,
-              label: { show: true, fontSize: 10 },
+              label: { show: true, fontSize: 10, color: '#fff' },
               itemStyle: { color: '#ef4444' }
             }
           : null)
@@ -597,6 +620,10 @@ export class DashboardComponent {
       catchError(() => of(null)),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe((narrative) => this.narrative.set(narrative));
+  }
+
+  private get themeTextColor(): string {
+    return getComputedStyle(document.documentElement).getPropertyValue('--text-color').trim() || '#374151';
   }
 
   protected abs(value: number | null | undefined): number {

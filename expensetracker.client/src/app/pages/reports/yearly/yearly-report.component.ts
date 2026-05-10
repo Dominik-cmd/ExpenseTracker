@@ -72,41 +72,63 @@ const YEARLY_FALLBACK: YearlyReport = {
         <div echarts [options]="evolutionOptions()" class="chart"></div>
       </p-card>
 
-      <div class="grid">
-        <div class="col-12 xl:col-6">
-          <p-card header="Month × category grid">
-            <p-table [value]="report().monthlyCategories" responsiveLayout="scroll">
-              <ng-template pTemplate="header">
-                <tr><th>Month</th><th>Category</th><th>Amount</th></tr>
-              </ng-template>
-              <ng-template pTemplate="body" let-item>
+      <p-card header="Month × category" subheader="Top 8 categories by annual spend · colour intensity = relative share within each column">
+        @if (heatmapData().rows.length) {
+          <div class="heatmap-scroll">
+            <table class="heatmap-table">
+              <thead>
                 <tr>
-                  <td>{{ item.month }}</td>
-                  <td>{{ item.categoryName }}</td>
-                  <td>{{ item.amount | currency:'EUR' }}</td>
+                  <th class="heatmap-month-col"></th>
+                  @for (col of heatmapData().colTotals; track col.name) {
+                    <th class="heatmap-cat-header" [title]="col.name">{{ col.name }}</th>
+                  }
+                  <th class="heatmap-total-header">Total</th>
                 </tr>
-              </ng-template>
-            </p-table>
-          </p-card>
-        </div>
-        <div class="col-12 xl:col-6">
-          <p-card header="Largest transactions">
-            <p-table [value]="report().largestTransactions" responsiveLayout="scroll">
-              <ng-template pTemplate="header">
-                <tr><th>Date</th><th>Merchant</th><th>Category</th><th>Amount</th></tr>
-              </ng-template>
-              <ng-template pTemplate="body" let-transaction>
-                <tr>
-                  <td>{{ transaction.transactionDate | date:'mediumDate' }}</td>
-                  <td>{{ transaction.merchantNormalized || 'Manual entry' }}</td>
-                  <td>{{ transaction.parentCategoryName || transaction.categoryName }}</td>
-                  <td>{{ transaction.amount | currency:'EUR' }}</td>
+              </thead>
+              <tbody>
+                @for (row of heatmapData().rows; track row.month) {
+                  <tr>
+                    <td class="heatmap-month-label">{{ row.label }}</td>
+                    @for (cell of row.cells; track $index) {
+                      <td class="heatmap-cell" [style.background]="cellBackground(cell.intensity, heatmapData().colTotals[$index].color)">
+                        @if (cell.amount > 0) { {{ cell.amount | currency:'EUR':'symbol':'1.0-0' }} }
+                      </td>
+                    }
+                    <td class="heatmap-row-total">{{ row.total | currency:'EUR':'symbol':'1.0-0' }}</td>
+                  </tr>
+                }
+              </tbody>
+              <tfoot>
+                <tr class="heatmap-foot">
+                  <td class="heatmap-month-label">Total</td>
+                  @for (col of heatmapData().colTotals; track col.name) {
+                    <td class="heatmap-cell heatmap-foot-cell">{{ col.total | currency:'EUR':'symbol':'1.0-0' }}</td>
+                  }
+                  <td class="heatmap-row-total heatmap-foot-cell">{{ grandTotal() | currency:'EUR':'symbol':'1.0-0' }}</td>
                 </tr>
-              </ng-template>
-            </p-table>
-          </p-card>
-        </div>
-      </div>
+              </tfoot>
+            </table>
+          </div>
+        } @else {
+          <div class="empty-state">No monthly category data available for {{ selectedYear() }}.</div>
+        }
+      </p-card>
+
+      <p-card header="Largest transactions">
+        <p-table [value]="report().largestTransactions" responsiveLayout="scroll">
+          <ng-template pTemplate="header">
+            <tr><th>Date</th><th>Merchant</th><th>Category</th><th>Amount</th></tr>
+          </ng-template>
+          <ng-template pTemplate="body" let-transaction>
+            <tr>
+              <td>{{ transaction.transactionDate | date:'mediumDate' }}</td>
+              <td>{{ transaction.merchantNormalized || 'Manual entry' }}</td>
+              <td>{{ transaction.parentCategoryName || transaction.categoryName }}</td>
+              <td>{{ transaction.amount | currency:'EUR' }}</td>
+            </tr>
+          </ng-template>
+        </p-table>
+      </p-card>
     </div>
   `,
   styles: [`
@@ -140,6 +162,84 @@ const YEARLY_FALLBACK: YearlyReport = {
     .chart { width: 100%; height: 24rem; }
     .metric-label { color: var(--text-color-secondary); font-size: 0.875rem; }
     .metric-value { font-size: 1.35rem; font-weight: 600; margin-top: 0.35rem; }
+
+    .heatmap-scroll {
+      overflow-x: auto;
+    }
+
+    .heatmap-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 3px;
+      min-width: 560px;
+    }
+
+    .heatmap-cat-header {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-color-secondary);
+      text-align: right;
+      padding: 0 0.4rem 0.6rem;
+      max-width: 80px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .heatmap-total-header {
+      font-size: 0.72rem;
+      font-weight: 600;
+      color: var(--text-color-secondary);
+      text-align: right;
+      padding: 0 0 0.6rem 0.75rem;
+      white-space: nowrap;
+    }
+
+    .heatmap-month-col { min-width: 36px; }
+
+    .heatmap-month-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--text-color-secondary);
+      padding: 0.35rem 0.75rem 0.35rem 0;
+      white-space: nowrap;
+    }
+
+    .heatmap-cell {
+      text-align: right;
+      font-size: 0.78rem;
+      color: var(--text-color);
+      padding: 0.35rem 0.5rem;
+      border-radius: 5px;
+      min-width: 68px;
+      transition: background 0.15s;
+    }
+
+    .heatmap-row-total {
+      text-align: right;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding-left: 0.75rem;
+      color: var(--text-color);
+      white-space: nowrap;
+    }
+
+    .heatmap-foot .heatmap-month-label {
+      font-weight: 700;
+      color: var(--text-color);
+    }
+
+    .heatmap-foot-cell {
+      font-weight: 600;
+      border-top: 1px solid var(--surface-border);
+      padding-top: 0.5rem;
+    }
+
+    .empty-state {
+      padding: 1.5rem;
+      text-align: center;
+      color: var(--text-color-secondary);
+    }
 
     .category-chip {
       padding: 0.35rem 0.75rem;
@@ -197,6 +297,58 @@ export class YearlyReportComponent {
     return this.report().categoryEvolution.filter((series) => selected.has(series.categoryName));
   });
 
+  protected readonly heatmapData = computed(() => {
+    const items = this.report().monthlyCategories;
+
+    const categoryTotals = new Map<string, number>();
+    for (const item of items) {
+      categoryTotals.set(item.categoryName, (categoryTotals.get(item.categoryName) ?? 0) + item.amount);
+    }
+
+    const topCategories = [...categoryTotals.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([name]) => name);
+
+    const lookup = new Map<string, number>();
+    for (const item of items) {
+      lookup.set(`${item.month}:${item.categoryName}`, item.amount);
+    }
+
+    const colMax = topCategories.map((cat) => {
+      let max = 0;
+      for (let m = 1; m <= 12; m++) {
+        const v = lookup.get(`${m}:${cat}`) ?? 0;
+        if (v > max) max = v;
+      }
+      return max;
+    });
+
+    const activeMonths = [...new Set(items.map((i) => i.month))].sort((a, b) => a - b);
+
+    const rows = activeMonths.map((month) => ({
+      month,
+      label: MONTH_LABELS[month - 1],
+      cells: topCategories.map((cat, ci) => {
+        const amount = lookup.get(`${month}:${cat}`) ?? 0;
+        return { amount, intensity: colMax[ci] > 0 ? amount / colMax[ci] : 0 };
+      }),
+      total: topCategories.reduce((sum, cat) => sum + (lookup.get(`${month}:${cat}`) ?? 0), 0)
+    }));
+
+    const colTotals = topCategories.map((cat) => ({
+      name: cat,
+      total: activeMonths.reduce((sum, month) => sum + (lookup.get(`${month}:${cat}`) ?? 0), 0),
+      color: this.getCategoryColor(cat, null)
+    }));
+
+    return { topCategories, colTotals, rows };
+  });
+
+  protected readonly grandTotal = computed(() =>
+    this.heatmapData().colTotals.reduce((sum, col) => sum + col.total, 0)
+  );
+
   protected readonly evolutionOptions = computed<EChartsOption>(() => ({
     tooltip: { trigger: 'axis' },
     legend: { top: 0, data: this.visibleCategoryEvolution().map((series) => series.categoryName) },
@@ -246,6 +398,16 @@ export class YearlyReportComponent {
 
   protected getCategoryColor(name: string, fallback?: string | null): string {
     return this.categoryColors().get(name) ?? fallback ?? FALLBACK_CATEGORY_COLOR;
+  }
+
+  protected cellBackground(intensity: number, color: string): string {
+    if (intensity === 0 || !color || color.length < 6) return 'transparent';
+    const hex = color.replace('#', '');
+    if (hex.length !== 6) return 'transparent';
+    const r = parseInt(hex.substring(0, 2), 16);
+    const g = parseInt(hex.substring(2, 4), 16);
+    const b = parseInt(hex.substring(4, 6), 16);
+    return `rgba(${r}, ${g}, ${b}, ${Math.max(0.07, intensity * 0.55)})`;
   }
 
   private loadCategories(): void {
