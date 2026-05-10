@@ -133,6 +133,7 @@ const TRANSACTION_TYPE_OPTIONS = ['Purchase', 'Transfer', 'Withdrawal', 'Fee', '
         [lazy]="true"
         [paginator]="true"
         [rows]="rows"
+        [rowsPerPageOptions]="[10, 25, 100]"
         [first]="first"
         [totalRecords]="effectiveTotalRecords()"
         [loading]="loading"
