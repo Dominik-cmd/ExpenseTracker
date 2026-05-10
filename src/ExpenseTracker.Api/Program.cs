@@ -6,6 +6,8 @@ using ExpenseTracker.Api.Services;
 using ExpenseTracker.Core.Enums;
 using ExpenseTracker.Core.Interfaces;
 using ExpenseTracker.Infrastructure;
+using ExpenseTracker.Infrastructure.Investments;
+using ExpenseTracker.Infrastructure.Investments.Ibkr;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 
@@ -53,6 +55,17 @@ builder.Services.AddHttpClient("Gemini");
 builder.Services.AddHostedService<SmsProcessingBackgroundService>();
 builder.Services.AddHostedService<NarrativeRegenerationWorker>();
 builder.Services.AddHostedService<DailyNarrativeWorker>();
+
+// Investment services
+builder.Services.AddScoped<InvestmentAnalyticsService>();
+builder.Services.AddScoped<PortfolioHistoryService>();
+builder.Services.AddScoped<IbkrFlexClient>();
+builder.Services.AddScoped<IbkrFlexParser>();
+builder.Services.AddScoped<IbkrFlexProvider>();
+builder.Services.AddScoped<IbkrPersistenceService>();
+builder.Services.AddScoped<ManualInvestmentProvider>();
+builder.Services.AddHostedService<InvestmentSyncWorker>();
+builder.Services.AddHttpClient("IbkrFlex");
 
 var keyPath = Environment.GetEnvironmentVariable("DATA_PROTECTION_KEY_PATH")
     ?? Path.Combine(builder.Environment.ContentRootPath, "data-protection-keys");

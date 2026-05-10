@@ -40,6 +40,20 @@ public sealed class SeedDataService : IHostedService
         {
             await SeedForUserAsync(user, cancellationToken);
         }
+
+        // Seed investment providers for users created before this feature.
+        var existingUserIds = user is null
+            ? await _dbContext.Users.Select(existingUser => existingUser.Id).ToListAsync(cancellationToken)
+            : await _dbContext.Users
+                .Where(existingUser => existingUser.Id != user.Id)
+                .Select(existingUser => existingUser.Id)
+                .ToListAsync(cancellationToken);
+
+        foreach (var existingUserId in existingUserIds)
+        {
+            await SeedInvestmentProvidersAsync(existingUserId, cancellationToken);
+        }
+
         await _dbContext.SaveChangesAsync(cancellationToken);
     }
 
@@ -49,6 +63,7 @@ public sealed class SeedDataService : IHostedService
         await SeedCategoriesAsync(user.Id, cancellationToken);
         await SeedLlmProvidersAsync(user.Id, cancellationToken);
         await SeedSettingsAsync(user.Id, cancellationToken);
+        await SeedInvestmentProvidersAsync(user.Id, cancellationToken);
     }
 
     private async Task MigrateColumnsAsync(CancellationToken cancellationToken)
@@ -272,6 +287,141 @@ public sealed class SeedDataService : IHostedService
               AND parent_category_id IS NOT NULL
               AND exclude_from_income = false;
             """, cancellationToken);
+
+        // ── Investment tables ──
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS investment_providers (
+                id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                provider_type text NOT NULL,
+                display_name text NOT NULL,
+                api_token_encrypted text,
+                extra_config jsonb,
+                is_enabled boolean NOT NULL DEFAULT false,
+                last_sync_at timestamptz,
+                last_sync_status text,
+                last_sync_error text,
+                last_test_at timestamptz,
+                last_test_status text,
+                last_test_error text,
+                created_at timestamptz NOT NULL DEFAULT now(),
+                updated_at timestamptz NOT NULL DEFAULT now()
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ix_investment_providers_user_provider
+                ON investment_providers (user_id, provider_type);
+            """, cancellationToken);
+
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS investment_accounts (
+                id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                provider_id uuid NOT NULL REFERENCES investment_providers(id) ON DELETE CASCADE,
+                user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                external_account_id text,
+                display_name text NOT NULL,
+                account_type text NOT NULL,
+                base_currency text NOT NULL DEFAULT 'EUR',
+                icon text,
+                color text,
+                is_active boolean NOT NULL DEFAULT true,
+                sort_order int NOT NULL DEFAULT 0,
+                notes text,
+                created_at timestamptz NOT NULL DEFAULT now(),
+                updated_at timestamptz NOT NULL DEFAULT now()
+            );
+            """, cancellationToken);
+
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS instruments (
+                id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                symbol text NOT NULL,
+                name text,
+                asset_class text NOT NULL,
+                currency text NOT NULL,
+                sector text,
+                region text,
+                isin text,
+                created_at timestamptz NOT NULL DEFAULT now()
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ix_instruments_symbol_class_currency
+                ON instruments (symbol, asset_class, currency);
+            """, cancellationToken);
+
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS holdings (
+                id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                account_id uuid NOT NULL REFERENCES investment_accounts(id) ON DELETE CASCADE,
+                instrument_id uuid NOT NULL REFERENCES instruments(id),
+                quantity decimal(18,4) NOT NULL,
+                cost_basis_per_share decimal(18,4),
+                mark_price decimal(18,4),
+                market_value decimal(18,4) NOT NULL,
+                unrealized_pnl decimal(18,4),
+                unrealized_pnl_percent decimal(10,4),
+                currency text NOT NULL,
+                as_of timestamptz NOT NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ix_holdings_account_instrument
+                ON holdings (account_id, instrument_id);
+            """, cancellationToken);
+
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS investment_transactions (
+                id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                account_id uuid NOT NULL REFERENCES investment_accounts(id) ON DELETE CASCADE,
+                instrument_id uuid REFERENCES instruments(id),
+                external_transaction_id text NOT NULL,
+                transaction_type text NOT NULL,
+                transaction_date timestamptz NOT NULL,
+                quantity decimal(18,4),
+                price decimal(18,4),
+                gross_amount decimal(18,4),
+                commission decimal(18,4) DEFAULT 0,
+                net_amount decimal(18,4) NOT NULL,
+                currency text NOT NULL,
+                description text,
+                created_at timestamptz NOT NULL DEFAULT now()
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ix_investment_txn_account_external
+                ON investment_transactions (account_id, external_transaction_id);
+            CREATE INDEX IF NOT EXISTS ix_investment_txn_date
+                ON investment_transactions (transaction_date);
+            """, cancellationToken);
+
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS manual_account_balances (
+                id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                account_id uuid NOT NULL UNIQUE REFERENCES investment_accounts(id) ON DELETE CASCADE,
+                balance decimal(18,4) NOT NULL,
+                currency text NOT NULL,
+                updated_at timestamptz NOT NULL DEFAULT now()
+            );
+            """, cancellationToken);
+
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS manual_balance_history (
+                id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                account_id uuid NOT NULL REFERENCES investment_accounts(id) ON DELETE CASCADE,
+                balance decimal(18,4) NOT NULL,
+                currency text NOT NULL,
+                recorded_at timestamptz NOT NULL DEFAULT now(),
+                note text
+            );
+            CREATE INDEX IF NOT EXISTS ix_manual_balance_history_account_date
+                ON manual_balance_history (account_id, recorded_at DESC);
+            """, cancellationToken);
+
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS portfolio_history (
+                id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                account_id uuid NOT NULL REFERENCES investment_accounts(id) ON DELETE CASCADE,
+                snapshot_date date NOT NULL,
+                market_value decimal(18,4) NOT NULL,
+                currency text NOT NULL,
+                source text NOT NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ix_portfolio_history_account_date
+                ON portfolio_history (account_id, snapshot_date);
+            """, cancellationToken);
     }
 
     private async Task<User?> SeedUserAsync(string initialPassword, CancellationToken cancellationToken)
@@ -433,6 +583,40 @@ public sealed class SeedDataService : IHostedService
                 Key = "sms_senders",
                 UserId = userId,
                 Value = JsonSerializer.Serialize(new[] { "OTP banka", "OTP", "OTP Banka" })
+            });
+        }
+    }
+
+    private async Task SeedInvestmentProvidersAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var existingTypes = await _dbContext.InvestmentProviders
+            .Where(p => p.UserId == userId)
+            .Select(p => p.ProviderType)
+            .ToHashSetAsync(cancellationToken);
+
+        if (!existingTypes.Contains(InvestmentProviderType.Ibkr))
+        {
+            _dbContext.InvestmentProviders.Add(new InvestmentProvider
+            {
+                UserId = userId,
+                ProviderType = InvestmentProviderType.Ibkr,
+                DisplayName = "Interactive Brokers",
+                IsEnabled = false,
+                LastSyncStatus = "never",
+                LastTestStatus = "untested"
+            });
+        }
+
+        if (!existingTypes.Contains(InvestmentProviderType.Manual))
+        {
+            _dbContext.InvestmentProviders.Add(new InvestmentProvider
+            {
+                UserId = userId,
+                ProviderType = InvestmentProviderType.Manual,
+                DisplayName = "Manual entries",
+                IsEnabled = false,
+                LastSyncStatus = "n/a",
+                LastTestStatus = "untested"
             });
         }
     }

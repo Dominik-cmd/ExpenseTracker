@@ -25,6 +25,8 @@ public class User
     public ICollection<MerchantRule> MerchantRules { get; set; } = new List<MerchantRule>();
     public ICollection<RawMessage> RawMessages { get; set; } = new List<RawMessage>();
     public ICollection<LlmProvider> LlmProviders { get; set; } = new List<LlmProvider>();
+    public ICollection<InvestmentProvider> InvestmentProviders { get; set; } = new List<InvestmentProvider>();
+    public ICollection<InvestmentAccount> InvestmentAccounts { get; set; } = new List<InvestmentAccount>();
     public ICollection<Setting> Settings { get; set; } = new List<Setting>();
     public ICollection<AuditLog> AuditLogs { get; set; } = new List<AuditLog>();
 }

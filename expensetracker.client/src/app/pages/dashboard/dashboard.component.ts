@@ -11,6 +11,7 @@ import {
   ApiService,
   DashboardAnalytics,
   DashboardStrip,
+  InvestmentDashboardStrip,
   NarrativeResponse,
   Transaction
 } from '../../core/services/api.service';
@@ -61,6 +62,45 @@ const DASHBOARD_FALLBACK: DashboardAnalytics = {
           <div class="narrative-stale">updating...</div>
         }
       </p-card>
+
+      @if (investmentStrip()?.hasData) {
+        <p-card styleClass="investment-strip-card">
+          <div class="investment-strip" routerLink="/investments" style="cursor: pointer">
+            <div class="strip-numbers" style="font-size: 0.9em; opacity: 0.85">
+              <span class="strip-item">
+                <span class="strip-label">Portfolio</span>
+                <span class="strip-value">{{ investmentStrip()!.totalValue | currency:'EUR':'symbol':'1.0-0' }}</span>
+              </span>
+              <span class="strip-sep">·</span>
+              <span class="strip-item">
+                <span class="strip-label">Today</span>
+                <span
+                  class="strip-value"
+                  [class.text-positive]="(investmentStrip()!.dayChange ?? 0) > 0"
+                  [class.text-negative]="(investmentStrip()!.dayChange ?? 0) < 0">
+                  @if (investmentStrip()!.dayChange !== null) {
+                    {{ investmentStrip()!.dayChange! >= 0 ? '+' : '' }}{{ investmentStrip()!.dayChange | currency:'EUR':'symbol':'1.0-0' }}
+                    ({{ investmentStrip()!.dayChangePercent! >= 0 ? '+' : '' }}{{ investmentStrip()!.dayChangePercent | number:'1.1-1' }}%)
+                  } @else { — }
+                </span>
+              </span>
+              <span class="strip-sep">·</span>
+              <span class="strip-item">
+                <span class="strip-label">YTD</span>
+                <span
+                  class="strip-value"
+                  [class.text-positive]="(investmentStrip()!.ytdChange ?? 0) > 0"
+                  [class.text-negative]="(investmentStrip()!.ytdChange ?? 0) < 0">
+                  @if (investmentStrip()!.ytdChange !== null) {
+                    {{ investmentStrip()!.ytdChange! >= 0 ? '+' : '' }}{{ investmentStrip()!.ytdChange | currency:'EUR':'symbol':'1.0-0' }}
+                    ({{ investmentStrip()!.ytdChangePercent! >= 0 ? '+' : '' }}{{ investmentStrip()!.ytdChangePercent | number:'1.1-1' }}%)
+                  } @else { — }
+                </span>
+              </span>
+            </div>
+          </div>
+        </p-card>
+      }
 
       <div class="main-grid">
         <div class="fill-card-wrapper">
@@ -388,6 +428,7 @@ export class DashboardComponent {
   });
 
   protected readonly strip = signal<DashboardStrip>(STRIP_FALLBACK);
+  protected readonly investmentStrip = signal<InvestmentDashboardStrip | null>(null);
   protected readonly analytics = signal<DashboardAnalytics | null>(null);
   protected readonly narrative = signal<NarrativeResponse | null>(null);
 
@@ -453,12 +494,14 @@ export class DashboardComponent {
   constructor() {
     forkJoin({
       strip: this.apiService.getDashboardStrip().pipe(catchError(() => of(STRIP_FALLBACK))),
+      investmentStrip: this.apiService.getInvestmentDashboardStrip().pipe(catchError(() => of(null))),
       analytics: this.apiService.getDashboardAnalytics().pipe(catchError(() => of(DASHBOARD_FALLBACK))),
       narrative: this.apiService.getDashboardNarrative().pipe(catchError(() => of(null)))
     }).pipe(
       takeUntilDestroyed(this.destroyRef)
-    ).subscribe(({ strip, analytics, narrative }) => {
+    ).subscribe(({ strip, investmentStrip, analytics, narrative }) => {
       this.strip.set(strip);
+      this.investmentStrip.set(investmentStrip);
       this.analytics.set(analytics);
       this.narrative.set(narrative);
     });

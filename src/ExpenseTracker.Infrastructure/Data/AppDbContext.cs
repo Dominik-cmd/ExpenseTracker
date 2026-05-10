@@ -17,6 +17,14 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : DbContext(op
     public DbSet<Setting> Settings => Set<Setting>();
     public DbSet<LlmCallLog> LlmCallLogs => Set<LlmCallLog>();
     public DbSet<Summary> Summaries => Set<Summary>();
+    public DbSet<InvestmentProvider> InvestmentProviders => Set<InvestmentProvider>();
+    public DbSet<InvestmentAccount> InvestmentAccounts => Set<InvestmentAccount>();
+    public DbSet<Instrument> Instruments => Set<Instrument>();
+    public DbSet<Holding> Holdings => Set<Holding>();
+    public DbSet<InvestmentTransaction> InvestmentTransactions => Set<InvestmentTransaction>();
+    public DbSet<ManualAccountBalance> ManualAccountBalances => Set<ManualAccountBalance>();
+    public DbSet<ManualBalanceHistory> ManualBalanceHistories => Set<ManualBalanceHistory>();
+    public DbSet<PortfolioHistory> PortfolioHistories => Set<PortfolioHistory>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

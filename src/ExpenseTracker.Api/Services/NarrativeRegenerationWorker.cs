@@ -39,6 +39,9 @@ public sealed class NarrativeRegenerationWorker(
                     case "yearly" when request.Year.HasValue:
                         await narrativeService.RegenerateYearlyNarrativeAsync(request.UserId, request.Year.Value, force: false, stoppingToken);
                         break;
+                    case "investments":
+                        await narrativeService.RegenerateInvestmentNarrativeAsync(request.UserId, force: false, stoppingToken);
+                        break;
                 }
             }
             catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)

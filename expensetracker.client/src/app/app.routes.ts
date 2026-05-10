@@ -80,5 +80,15 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadComponent: () => import('./pages/queue/queue.component').then((m) => m.QueueComponent)
   },
+  {
+    path: 'investments',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/investments/investments.component').then((m) => m.InvestmentsComponent)
+  },
+  {
+    path: 'settings/investments',
+    canActivate: [authGuard],
+    loadComponent: () => import('./pages/settings/investments/investment-settings.component').then((m) => m.InvestmentSettingsComponent)
+  },
   { path: '**', redirectTo: 'dashboard' }
 ];

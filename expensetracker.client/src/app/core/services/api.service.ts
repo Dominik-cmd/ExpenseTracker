@@ -414,6 +414,116 @@ export interface QueueStatus {
   recentlyProcessed: RecentItem[];
 }
 
+// Investment interfaces
+export interface InvestmentDashboardStrip {
+  totalValue: number;
+  dayChange: number | null;
+  dayChangePercent: number | null;
+  ytdChange: number | null;
+  ytdChangePercent: number | null;
+  hasData: boolean;
+}
+
+export interface PortfolioSummary {
+  totalValue: number;
+  ibkrValue: number;
+  manualValue: number;
+  dayChange: number | null;
+  dayChangePercent: number | null;
+  ytdChange: number | null;
+  ytdChangePercent: number | null;
+  baseCurrency: string;
+  asOf: string;
+  oldestManualUpdateDays: number | null;
+}
+
+export interface AccountSummary {
+  accountId: string;
+  displayName: string;
+  accountType: string;
+  providerType: string;
+  icon: string;
+  color: string;
+  value: number;
+  currency: string;
+  valueInBaseCurrency: number;
+  lastUpdated: string | null;
+  daysSinceUpdate: number | null;
+}
+
+export interface InvestmentHolding {
+  id: string;
+  accountName: string;
+  symbol: string;
+  name: string | null;
+  assetClass: string;
+  quantity: number;
+  costBasisPerShare: number | null;
+  markPrice: number | null;
+  marketValue: number;
+  unrealizedPnl: number | null;
+  unrealizedPnlPercent: number | null;
+  currency: string;
+}
+
+export interface AllocationBreakdown {
+  allocationType: string;
+  totalValue: number;
+  slices: AllocationSlice[];
+}
+
+export interface AllocationSlice {
+  label: string;
+  value: number;
+  percentage: number;
+}
+
+export interface HistoryPoint {
+  date: string;
+  value: number;
+}
+
+export interface RecentActivity {
+  date: string;
+  accountId: string;
+  accountDisplayName: string;
+  providerType: string;
+  activityType: string;
+  description: string;
+  amount: number | null;
+  currency: string;
+  quantity: number | null;
+  instrumentSymbol: string | null;
+}
+
+export interface ManualAccount {
+  id: string;
+  displayName: string;
+  accountType: string;
+  currency: string;
+  balance: number | null;
+  icon: string | null;
+  color: string | null;
+  notes: string | null;
+  isActive: boolean;
+  lastUpdated: string | null;
+}
+
+export interface InvestmentProvider {
+  id: string;
+  providerType: string;
+  displayName: string;
+  hasToken: boolean;
+  extraConfig: any;
+  isEnabled: boolean;
+  lastSyncAt: string | null;
+  lastSyncStatus: string | null;
+  lastSyncError: string | null;
+  lastTestAt: string | null;
+  lastTestStatus: string | null;
+  lastTestError: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private readonly http = inject(HttpClient);
@@ -678,6 +788,98 @@ export class ApiService {
 
   deleteUser(id: string): Observable<void> {
     return this.http.delete<void>(buildApiUrl(`/api/admin/users/${id}`));
+  }
+
+  // Investment API methods
+  getInvestmentDashboardStrip(): Observable<InvestmentDashboardStrip> {
+    return this.http.get<InvestmentDashboardStrip>(buildApiUrl('/api/investments/dashboard-strip'));
+  }
+
+  getPortfolioSummary(): Observable<PortfolioSummary> {
+    return this.http.get<PortfolioSummary>(buildApiUrl('/api/investments/summary'));
+  }
+
+  getInvestmentAccounts(): Observable<AccountSummary[]> {
+    return this.http.get<AccountSummary[]>(buildApiUrl('/api/investments/accounts'));
+  }
+
+  getInvestmentHoldings(): Observable<InvestmentHolding[]> {
+    return this.http.get<InvestmentHolding[]>(buildApiUrl('/api/investments/holdings'));
+  }
+
+  getInvestmentAllocation(type: string = 'accountType'): Observable<AllocationBreakdown> {
+    return this.http.get<AllocationBreakdown>(buildApiUrl('/api/investments/allocation'), {
+      params: new HttpParams().set('type', type)
+    });
+  }
+
+  getPortfolioHistory(from?: string, to?: string): Observable<HistoryPoint[]> {
+    let params = new HttpParams();
+    if (from) params = params.set('from', from);
+    if (to) params = params.set('to', to);
+    return this.http.get<HistoryPoint[]>(buildApiUrl('/api/investments/history'), { params });
+  }
+
+  getInvestmentActivity(limit: number = 50): Observable<RecentActivity[]> {
+    return this.http.get<RecentActivity[]>(buildApiUrl('/api/investments/activity'), {
+      params: new HttpParams().set('limit', limit)
+    });
+  }
+
+  getInvestmentNarrative(): Observable<NarrativeResponse | null> {
+    return this.http.get<NarrativeResponse | null>(buildApiUrl('/api/investments/narrative'));
+  }
+
+  getManualAccounts(): Observable<ManualAccount[]> {
+    return this.http.get<ManualAccount[]>(buildApiUrl('/api/investments/manual/accounts'));
+  }
+
+  createManualAccount(payload: { displayName: string; accountType: string; currency?: string; initialBalance?: number; icon?: string; color?: string; notes?: string }): Observable<{ id: string }> {
+    return this.http.post<{ id: string }>(buildApiUrl('/api/investments/manual/accounts'), payload);
+  }
+
+  updateManualAccount(id: string, payload: { displayName?: string; accountType?: string; icon?: string; color?: string; notes?: string; isActive?: boolean }): Observable<void> {
+    return this.http.patch<void>(buildApiUrl(`/api/investments/manual/accounts/${id}`), payload);
+  }
+
+  deleteManualAccount(id: string): Observable<void> {
+    return this.http.delete<void>(buildApiUrl(`/api/investments/manual/accounts/${id}`));
+  }
+
+  updateManualBalance(accountId: string, payload: { newBalance: number; note?: string }): Observable<{ balance: number }> {
+    return this.http.post<{ balance: number }>(buildApiUrl(`/api/investments/manual/accounts/${accountId}/balance`), payload);
+  }
+
+  getManualBalanceHistory(accountId: string): Observable<{ balance: number; currency: string; recordedAt: string; note: string | null }[]> {
+    return this.http.get<{ balance: number; currency: string; recordedAt: string; note: string | null }[]>(buildApiUrl(`/api/investments/manual/accounts/${accountId}/history`));
+  }
+
+  getInvestmentProviders(): Observable<InvestmentProvider[]> {
+    return this.http.get<InvestmentProvider[]>(buildApiUrl('/api/investment-providers'));
+  }
+
+  updateInvestmentProvider(id: string, payload: { displayName?: string; apiToken?: string; extraConfig?: any }): Observable<void> {
+    return this.http.patch<void>(buildApiUrl(`/api/investment-providers/${id}`), payload);
+  }
+
+  testInvestmentProvider(id: string): Observable<{ success: boolean; message: string; latencyMs: number }> {
+    return this.http.post<{ success: boolean; message: string; latencyMs: number }>(buildApiUrl(`/api/investment-providers/${id}/test`), {});
+  }
+
+  enableInvestmentProvider(id: string): Observable<void> {
+    return this.http.post<void>(buildApiUrl(`/api/investment-providers/${id}/enable`), {});
+  }
+
+  disableInvestmentProvider(id: string): Observable<void> {
+    return this.http.post<void>(buildApiUrl(`/api/investment-providers/${id}/disable`), {});
+  }
+
+  triggerInvestmentSync(): Observable<{ positions: number; trades: number; warning: string | null }> {
+    return this.http.post<{ positions: number; trades: number; warning: string | null }>(buildApiUrl('/api/investments/sync'), {});
+  }
+
+  getInvestmentSyncStatus(): Observable<{ configured: boolean; enabled: boolean; lastSyncAt: string | null; lastSyncStatus: string | null; lastSyncError: string | null }> {
+    return this.http.get<{ configured: boolean; enabled: boolean; lastSyncAt: string | null; lastSyncStatus: string | null; lastSyncError: string | null }>(buildApiUrl('/api/investments/sync/status'));
   }
 
   private createParams(values: object): HttpParams {

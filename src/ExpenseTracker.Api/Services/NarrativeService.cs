@@ -75,6 +75,20 @@ public sealed class NarrativeService(
         await GenerateAndStoreAsync(userId, "yearly", year.ToString(), input, BuildYearlyPrompt(input, year), force, ct);
     }
 
+    public async Task<NarrativeResponse?> GetInvestmentNarrativeAsync(Guid userId, CancellationToken ct)
+    {
+        var cached = await GetLatestSummaryAsync("investments", "current", userId, ct);
+        return cached is null ? null : new NarrativeResponse(cached.Content, cached.GeneratedAt, cached.ModelUsed, false);
+    }
+
+    public async Task RegenerateInvestmentNarrativeAsync(Guid userId, bool force, CancellationToken ct)
+    {
+        var analyticsService = new InvestmentAnalyticsService(dbContext);
+        var input = await BuildInvestmentInputAsync(analyticsService, userId, ct);
+        if (input is null) return;
+        await GenerateAndStoreAsync(userId, "investments", "current", input, BuildInvestmentPrompt(input), force, ct);
+    }
+
     private async Task GenerateAndStoreAsync(Guid userId, string summaryType, string scope, object input, string userPrompt, bool force, CancellationToken ct)
     {
         var provider = await providerResolver.GetNarrativeProviderAsync(userId, ct);
@@ -426,6 +440,74 @@ public sealed class NarrativeService(
         Focus on: trajectory of the year, major categories, and any standout transaction or net-flow pattern. 2-3 sentences.
         """;
 
+    private async Task<InvestmentNarrativeInput?> BuildInvestmentInputAsync(InvestmentAnalyticsService analyticsService, Guid userId, CancellationToken ct)
+    {
+        try
+        {
+            var summary = await analyticsService.GetSummaryAsync(userId, ct);
+            if (summary.TotalValue == 0) return null;
+
+            var accounts = await analyticsService.GetAccountsAsync(userId, ct);
+            var largestAccount = accounts.OrderByDescending(a => a.Value).FirstOrDefault();
+            var accountTypeSummary = string.Join(", ", accounts
+                .GroupBy(a => a.AccountType)
+                .OrderByDescending(g => g.Sum(a => a.Value))
+                .Select(g => $"{g.Key}: {g.Sum(a => a.Value):N0}"));
+
+            return new InvestmentNarrativeInput(
+                TotalValue: summary.TotalValue,
+                DayChange: summary.DayChange,
+                DayChangePercent: summary.DayChangePercent,
+                YtdChange: summary.YtdChange,
+                YtdChangePercent: summary.YtdChangePercent,
+                IbkrValue: summary.IbkrValue,
+                IbkrPercent: summary.TotalValue > 0 ? Math.Round(summary.IbkrValue / summary.TotalValue * 100, 1) : 0,
+                ManualValue: summary.ManualValue,
+                ManualPercent: summary.TotalValue > 0 ? Math.Round(summary.ManualValue / summary.TotalValue * 100, 1) : 0,
+                AccountTypeSummary: accountTypeSummary,
+                LargestAccountName: largestAccount?.DisplayName ?? "N/A",
+                LargestAccountValue: largestAccount?.Value ?? 0,
+                DaysSinceManualUpdate: summary.OldestManualUpdateDays);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Failed to build investment narrative input for user {UserId}", userId);
+            return null;
+        }
+    }
+
+    private static string BuildInvestmentPrompt(InvestmentNarrativeInput input)
+    {
+        var daySign = input.DayChange.HasValue && input.DayChange.Value >= 0 ? "+" : "";
+        var ytdSign = input.YtdChange.HasValue && input.YtdChange.Value >= 0 ? "+" : "";
+
+        return $"""
+            Write ONE sentence (max 15 words) describing the investment portfolio status.
+
+            Style requirements:
+            - Lead with the takeaway, not the math
+            - Don't start with "Your portfolio is" — start with the observation
+            - Reference one specific account or trend if it carries the meaning
+            - Match the tone of these examples:
+              - "Up 8% YTD, mostly driven by IBKR holdings; manual accounts steady."
+              - "Mixed picture — brokerage gains offset by stale crypto balance."
+              - "Down 3% this month following the broader market correction."
+              - "Allocation tilting toward cash; manual savings growing while IBKR is flat."
+
+            Input data:
+            - Total value: EUR{input.TotalValue:N0}
+            - Day change: {daySign}EUR{input.DayChange:N0} ({input.DayChangePercent:N1}%)
+            - YTD change: {ytdSign}EUR{input.YtdChange:N0} ({input.YtdChangePercent:N1}%)
+            - IBKR value: EUR{input.IbkrValue:N0} ({input.IbkrPercent}%)
+            - Manual value: EUR{input.ManualValue:N0} ({input.ManualPercent}%)
+            - Account type breakdown: {input.AccountTypeSummary}
+            - Largest single account: {input.LargestAccountName} (EUR{input.LargestAccountValue:N0})
+            - Days since most recent manual balance update: {input.DaysSinceManualUpdate?.ToString() ?? "N/A"}
+
+            Output: ONE sentence. No greeting, no padding.
+            """;
+    }
+
     private static string GetCategoryKey(Transaction transaction)
         => transaction.Category.ParentCategory?.Name ?? transaction.Category.Name;
 
@@ -488,3 +570,13 @@ internal record YearlyNarrativeInput(
     string BiggestCategory,
     decimal YtdIncome,
     decimal YtdNet);
+
+internal record InvestmentNarrativeInput(
+    decimal TotalValue,
+    decimal? DayChange, decimal? DayChangePercent,
+    decimal? YtdChange, decimal? YtdChangePercent,
+    decimal IbkrValue, decimal IbkrPercent,
+    decimal ManualValue, decimal ManualPercent,
+    string AccountTypeSummary,
+    string LargestAccountName, decimal LargestAccountValue,
+    int? DaysSinceManualUpdate);

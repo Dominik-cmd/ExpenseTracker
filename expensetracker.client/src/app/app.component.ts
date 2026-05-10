@@ -33,7 +33,8 @@ const NAV_GROUPS: NavGroup[] = [
     collapsible: false,
     items: [
       { label: 'Dashboard', route: '/dashboard', icon: 'pi pi-chart-bar' },
-      { label: 'Transactions', route: '/transactions', icon: 'pi pi-wallet' }
+      { label: 'Transactions', route: '/transactions', icon: 'pi pi-wallet' },
+      { label: 'Investments', route: '/investments', icon: 'pi pi-chart-line' }
     ]
   },
   {
@@ -63,6 +64,7 @@ const NAV_GROUPS: NavGroup[] = [
       { label: 'Account', route: '/settings/account', icon: 'pi pi-user' },
       { label: 'LLM', route: '/settings/llm', icon: 'pi pi-bolt' },
       { label: 'Webhook', route: '/settings/webhook', icon: 'pi pi-send' },
+      { label: 'Investment providers', route: '/settings/investments', icon: 'pi pi-briefcase' },
       { label: 'User management', route: '/admin/users', icon: 'pi pi-users', adminOnly: true }
     ]
   }
