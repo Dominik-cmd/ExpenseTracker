@@ -23,7 +23,7 @@ jobs:
 
     - name: Install dependencies
       working-directory: ./expensetracker.client
-      run: npm ci
+      run: npm install
 
     - name: Run Linter
       working-directory: ./expensetracker.client
