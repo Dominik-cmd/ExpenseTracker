@@ -16,7 +16,7 @@ export class AppCurrencyPipe implements PipeTransform {
   private readonly currencyService = inject(CurrencyService);
   private readonly currencyPipe = new CurrencyPipe('en');
 
-  transform(value: number | null | undefined, digitsInfo: string = '1.2-2', display: string = 'symbol'): string | null {
+  transform(value: number | null | undefined, digitsInfo = '1.2-2', display = 'symbol'): string | null {
     if (value == null) return null;
     return this.currencyPipe.transform(value, this.currencyService.currency(), display, digitsInfo);
   }

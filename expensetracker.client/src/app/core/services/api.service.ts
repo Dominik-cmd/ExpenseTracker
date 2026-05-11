@@ -338,7 +338,7 @@ export class ApiService {
     return this.http.get<InvestmentHolding[]>(buildApiUrl('/api/investments/holdings'));
   }
 
-  getInvestmentAllocation(type: string = 'accountType'): Observable<AllocationBreakdown> {
+  getInvestmentAllocation(type = 'accountType'): Observable<AllocationBreakdown> {
     return this.http.get<AllocationBreakdown>(buildApiUrl('/api/investments/allocation'), {
       params: new HttpParams().set('type', type)
     });
@@ -351,7 +351,7 @@ export class ApiService {
     return this.http.get<HistoryPoint[]>(buildApiUrl('/api/investments/history'), { params });
   }
 
-  getInvestmentActivity(limit: number = 50): Observable<RecentActivity[]> {
+  getInvestmentActivity(limit = 50): Observable<RecentActivity[]> {
     return this.http.get<RecentActivity[]>(buildApiUrl('/api/investments/activity'), {
       params: new HttpParams().set('limit', limit)
     });
@@ -389,7 +389,7 @@ export class ApiService {
     return this.http.get<InvestmentProvider[]>(buildApiUrl('/api/investment-providers'));
   }
 
-  updateInvestmentProvider(id: string, payload: { displayName?: string; apiToken?: string; extraConfig?: any }): Observable<void> {
+  updateInvestmentProvider(id: string, payload: { displayName?: string; apiToken?: string; extraConfig?: unknown }): Observable<void> {
     return this.http.patch<void>(buildApiUrl(`/api/investment-providers/${id}`), payload);
   }
 

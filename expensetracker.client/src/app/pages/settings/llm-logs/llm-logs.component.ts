@@ -100,7 +100,7 @@ import { SettingsService } from '../../../core/services/settings.service';
                 <div class="text-xs text-color-secondary">{{ log.merchantRaw }}</div>
               }
             </td>
-            <td class="text-sm">{{ log.amount != null ? (log.amount | number:'1.2-2') + ' EUR' : '—' }}</td>
+            <td class="text-sm">{{ log.amount !== null ? (log.amount | number:'1.2-2') + ' EUR' : '—' }}</td>
             <td class="text-sm">{{ log.latencyMs | number:'1.0-0' }} ms</td>
             <td>
               <p-tag [value]="log.success ? 'OK' : 'Failed'" [severity]="log.success ? 'success' : 'danger'"></p-tag>
@@ -116,7 +116,7 @@ import { SettingsService } from '../../../core/services/settings.service';
               } @else if (log.errorMessage) {
                 <span class="text-xs text-red-400">{{ log.errorMessage | slice:0:60 }}…</span>
               }
-              @if (log.parsedConfidence != null) {
+              @if (log.parsedConfidence !== null) {
                 <span class="text-xs text-color-secondary ml-1">({{ (log.parsedConfidence * 100) | number:'1.0-0' }}%)</span>
               }
             </td>
@@ -173,7 +173,7 @@ import { SettingsService } from '../../../core/services/settings.service';
                   @if (log.parsedSubcategory) {
                     <span> › {{ log.parsedSubcategory }}</span>
                   }
-                  @if (log.parsedConfidence != null) {
+                  @if (log.parsedConfidence !== null) {
                     <span class="text-color-secondary ml-2">({{ (log.parsedConfidence * 100) | number:'1.0-0' }}% confidence)</span>
                   }
                 </div>

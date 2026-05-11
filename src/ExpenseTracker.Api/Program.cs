@@ -3,7 +3,6 @@ using System.Threading.Channels;
 using System.Threading.RateLimiting;
 using ExpenseTracker.Api.Middleware;
 using ExpenseTracker.Api.Services;
-using ExpenseTracker.Application.Interfaces;
 using ExpenseTracker.Application.Services;
 using ExpenseTracker.Core.Interfaces;
 using ExpenseTracker.Infrastructure;
@@ -33,30 +32,30 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
 var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET");
 if (!string.IsNullOrWhiteSpace(jwtSecret))
 {
-  builder.Configuration["Jwt:Secret"] = jwtSecret;
+    builder.Configuration["Jwt:Secret"] = jwtSecret;
 }
 
 // Fail-safe: prevent production startup with default/weak JWT secret
 if (!builder.Environment.IsDevelopment())
 {
-  var configuredSecret = builder.Configuration["Jwt:Secret"] ?? string.Empty;
-  if (configuredSecret.Length < 32 ||
-      configuredSecret.StartsWith("ReplaceWith", StringComparison.OrdinalIgnoreCase) ||
-      configuredSecret.Contains("development", StringComparison.OrdinalIgnoreCase))
-  {
-    throw new InvalidOperationException(
-      "JWT_SECRET must be set to a strong random value (minimum 32 characters) in production.");
-  }
+    var configuredSecret = builder.Configuration["Jwt:Secret"] ?? string.Empty;
+    if (configuredSecret.Length < 32 ||
+        configuredSecret.StartsWith("ReplaceWith", StringComparison.OrdinalIgnoreCase) ||
+        configuredSecret.Contains("development", StringComparison.OrdinalIgnoreCase))
+    {
+        throw new InvalidOperationException(
+          "JWT_SECRET must be set to a strong random value (minimum 32 characters) in production.");
+    }
 }
 
 if (string.IsNullOrWhiteSpace(builder.Configuration["Jwt:Issuer"]))
 {
-  builder.Configuration["Jwt:Issuer"] = "ExpenseTracker.Api";
+    builder.Configuration["Jwt:Issuer"] = "ExpenseTracker.Api";
 }
 
 if (string.IsNullOrWhiteSpace(builder.Configuration["Jwt:Audience"]))
 {
-  builder.Configuration["Jwt:Audience"] = "ExpenseTracker.Client";
+    builder.Configuration["Jwt:Audience"] = "ExpenseTracker.Client";
 }
 
 var connectionString = Environment.GetEnvironmentVariable("DB_CONNECTION_STRING")
@@ -138,7 +137,7 @@ builder.Services.AddScoped<ManualInvestmentProvider>();
 builder.Services.AddHostedService<InvestmentSyncWorker>();
 builder.Services.AddHttpClient("IbkrFlex", client =>
 {
-  client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; ExpenseTracker/1.0)");
+    client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; ExpenseTracker/1.0)");
 });
 
 var keyPath = Environment.GetEnvironmentVariable("DATA_PROTECTION_KEY_PATH")
@@ -150,9 +149,9 @@ builder.Services.AddDataProtection()
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
   .AddJwtBearer(options =>
   {
-    options.MapInboundClaims = false;
-    options.TokenValidationParameters =
-      new JwtService(builder.Configuration).GetValidationParameters();
+      options.MapInboundClaims = false;
+      options.TokenValidationParameters =
+        new JwtService(builder.Configuration).GetValidationParameters();
   });
 
 builder.Services.AddAuthorization();
@@ -161,69 +160,69 @@ builder.Services.AddProblemDetails();
 
 builder.Services.AddRateLimiter(options =>
 {
-  options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
-  options.AddPolicy(RateLimitingMiddleware.LoginPolicyName, httpContext =>
-    RateLimitPartition.GetFixedWindowLimiter(
-      partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-      factory: _ => new FixedWindowRateLimiterOptions
-      {
-        PermitLimit = 5,
-        Window = TimeSpan.FromMinutes(15),
-        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-        QueueLimit = 0,
-        AutoReplenishment = true
-      }));
-  options.AddPolicy(RateLimitingMiddleware.WebhookPolicyName, httpContext =>
-    RateLimitPartition.GetFixedWindowLimiter(
-      partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
-      factory: _ => new FixedWindowRateLimiterOptions
-      {
-        PermitLimit = 60,
-        Window = TimeSpan.FromMinutes(1),
-        QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
-        QueueLimit = 0,
-        AutoReplenishment = true
-      }));
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy(RateLimitingMiddleware.LoginPolicyName, httpContext =>
+      RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 5,
+            Window = TimeSpan.FromMinutes(15),
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 0,
+            AutoReplenishment = true
+        }));
+    options.AddPolicy(RateLimitingMiddleware.WebhookPolicyName, httpContext =>
+      RateLimitPartition.GetFixedWindowLimiter(
+        partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+        factory: _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = 60,
+            Window = TimeSpan.FromMinutes(1),
+            QueueProcessingOrder = QueueProcessingOrder.OldestFirst,
+            QueueLimit = 0,
+            AutoReplenishment = true
+        }));
 });
 
 var frontendOrigin = Environment.GetEnvironmentVariable("FRONTEND_ORIGIN");
 builder.Services.AddCors(options =>
 {
-  options.AddDefaultPolicy(policy =>
-  {
-    if (string.IsNullOrWhiteSpace(frontendOrigin))
+    options.AddDefaultPolicy(policy =>
     {
-      // In development allow localhost origins; never allow any origin.
-      policy.WithOrigins("http://localhost:4200", "https://localhost:4200")
-        .AllowAnyHeader().AllowAnyMethod();
-      return;
-    }
+        if (string.IsNullOrWhiteSpace(frontendOrigin))
+        {
+            // In development allow localhost origins; never allow any origin.
+            policy.WithOrigins("http://localhost:4200", "https://localhost:4200")
+            .AllowAnyHeader().AllowAnyMethod();
+            return;
+        }
 
-    policy.WithOrigins(frontendOrigin).AllowAnyHeader().AllowAnyMethod();
-  });
+        policy.WithOrigins(frontendOrigin).AllowAnyHeader().AllowAnyMethod();
+    });
 });
 
 var app = builder.Build();
 
 using (var scope = app.Services.CreateScope())
 {
-  var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-  await dbContext.Database.EnsureCreatedAsync();
-  await scope.ServiceProvider.GetRequiredService<ISeedDataService>().StartAsync(CancellationToken.None);
+    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await dbContext.Database.EnsureCreatedAsync();
+    await scope.ServiceProvider.GetRequiredService<ISeedDataService>().StartAsync(CancellationToken.None);
 }
 
 app.UseSerilogRequestLogging(options =>
 {
-  options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
-  {
-    diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value ?? string.Empty);
-    diagnosticContext.Set("UserAgent", httpContext.Request.Headers.UserAgent.ToString());
-  };
+    options.EnrichDiagnosticContext = (diagnosticContext, httpContext) =>
+    {
+        diagnosticContext.Set("RequestHost", httpContext.Request.Host.Value ?? string.Empty);
+        diagnosticContext.Set("UserAgent", httpContext.Request.Headers.UserAgent.ToString());
+    };
 });
 app.UseExceptionHandler();
 app.UseForwardedHeaders(new ForwardedHeadersOptions
 {
-  ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
+    ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto
 });
 app.UseCors();
 app.UseMiddleware<SecurityHeadersMiddleware>();
@@ -235,16 +234,16 @@ app.MapControllers();
 
 try
 {
-  Log.Information("ExpenseTracker starting up");
-  app.Run();
+    Log.Information("ExpenseTracker starting up");
+    app.Run();
 }
 catch (Exception ex)
 {
-  Log.Fatal(ex, "Application terminated unexpectedly");
+    Log.Fatal(ex, "Application terminated unexpectedly");
 }
 finally
 {
-  Log.CloseAndFlush();
+    Log.CloseAndFlush();
 }
 
 public partial class Program;

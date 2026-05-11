@@ -1,4 +1,3 @@
-using BCrypt.Net;
 using ExpenseTracker.Infrastructure;
 using FluentAssertions;
 using Microsoft.EntityFrameworkCore;

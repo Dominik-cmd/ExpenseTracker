@@ -6,7 +6,6 @@ import {
   MonthlyReport,
   PagedResult,
   QueueStatus,
-  Transaction,
   WebhookSettings,
   YearlyReport,
   LlmSettings,

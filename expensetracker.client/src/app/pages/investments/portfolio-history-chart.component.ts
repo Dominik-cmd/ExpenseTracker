@@ -78,7 +78,7 @@ export class PortfolioHistoryChartComponent {
       yAxis: { type: 'value', axisLabel: { formatter: (value: number) => `€${(value / 1000).toFixed(0)}k` } },
       tooltip: {
         trigger: 'axis',
-        formatter: (params: any) => {
+        formatter: (params: unknown) => {
           const point = Array.isArray(params) ? params[0] : params;
           return `${point.name}<br/>€${Number(point.value).toLocaleString('en', { maximumFractionDigits: 0 })}`;
         }

@@ -97,7 +97,7 @@ export interface InvestmentProvider {
   providerType: string;
   displayName: string;
   token: string | null;
-  extraConfig: any;
+  extraConfig: unknown;
   isEnabled: boolean;
   lastSyncAt: string | null;
   lastSyncStatus: string | null;

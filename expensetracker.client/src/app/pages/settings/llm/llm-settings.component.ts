@@ -118,7 +118,7 @@ export class LlmSettingsComponent {
     return match?.key ?? provider.id;
   }
 
-  protected modelOptions(_provider: LlmProvider): string[] {
+  protected modelOptions(): string[] {
     // Kept for backwards compat but model is now free-text input
     return [];
   }

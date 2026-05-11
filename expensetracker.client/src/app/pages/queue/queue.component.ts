@@ -119,7 +119,7 @@ export class QueueComponent implements OnInit {
       takeUntilDestroyed(this.destroyRef)
     ).subscribe({
       next: (data) => this.status.set(data),
-      error: () => {}
+      error: () => { /* error ignored */ }
     });
   }
 

@@ -4,7 +4,6 @@ using ExpenseTracker.Core.Entities;
 using ExpenseTracker.Core.Enums;
 using ExpenseTracker.Core.Investments;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace ExpenseTracker.Infrastructure.Investments.Ibkr;

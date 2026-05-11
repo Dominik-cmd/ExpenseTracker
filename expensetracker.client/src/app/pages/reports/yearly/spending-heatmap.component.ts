@@ -44,7 +44,7 @@ export class SpendingHeatmapComponent {
     return {
       tooltip: {
         position: 'top',
-        formatter: (params: any) => {
+        formatter: (params: unknown) => {
           const [date, amount] = (params?.data ?? []) as [string, number];
           const formattedDate = new Date(`${date}T00:00:00`).toLocaleDateString(undefined, {
             month: 'short',

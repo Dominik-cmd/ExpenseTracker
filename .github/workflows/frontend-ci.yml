@@ -1,0 +1,38 @@
+name: Angular Frontend CI
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Use Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '22.x'
+        cache: 'npm'
+        cache-dependency-path: expensetracker.client/package-lock.json
+
+    - name: Install dependencies
+      working-directory: ./expensetracker.client
+      run: npm ci
+
+    - name: Run Linter
+      working-directory: ./expensetracker.client
+      run: npm run lint
+
+    - name: Build
+      working-directory: ./expensetracker.client
+      run: npm run build -- --configuration production
+
+    - name: Test
+      working-directory: ./expensetracker.client
+      run: npm run test -- --watch=false --browsers=ChromeHeadless

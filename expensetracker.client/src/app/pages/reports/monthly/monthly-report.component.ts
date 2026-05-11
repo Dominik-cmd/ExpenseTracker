@@ -192,7 +192,7 @@ export class MonthlyReportComponent {
       grid: { left: 24, right: 24, top: 56, bottom: 24, containLabel: true },
       xAxis: { type: 'category', data: xLabels },
       yAxis: { type: 'value' },
-      series: [...(barSeries as any[]), ...(rolling7dSeries as any[])]
+      series: [...(barSeries as unknown[]), ...(rolling7dSeries as unknown[])]
     };
   });
 

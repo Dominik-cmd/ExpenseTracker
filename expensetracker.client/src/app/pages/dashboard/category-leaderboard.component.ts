@@ -124,7 +124,7 @@ export class CategoryLeaderboardComponent {
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'shadow' },
-        formatter: (params: { dataIndex: number } | Array<{ dataIndex: number }>) => {
+        formatter: (params: { dataIndex: number } | { dataIndex: number }[]) => {
           const point = Array.isArray(params) ? params[0] : params;
           const item = items[point.dataIndex];
           return `${item.name}<br>${this.formatAmount(item.amount)} · ${item.percentage.toFixed(1)}%`;

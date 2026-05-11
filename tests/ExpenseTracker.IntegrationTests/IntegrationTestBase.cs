@@ -1,8 +1,6 @@
 using System.Net.Http.Json;
-using ExpenseTracker.Application.Models;
 using ExpenseTracker.Core.Entities;
 using ExpenseTracker.Core.Enums;
-using ExpenseTracker.Infrastructure;
 using Microsoft.EntityFrameworkCore;
 
 namespace ExpenseTracker.IntegrationTests;

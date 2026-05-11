@@ -1,7 +1,6 @@
 using System.Text;
 using ExpenseTracker.Core.Entities;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.EntityFrameworkCore.Metadata;
 
 namespace ExpenseTracker.Infrastructure;
 

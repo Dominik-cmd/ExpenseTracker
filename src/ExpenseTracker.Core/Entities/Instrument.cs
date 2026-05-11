@@ -11,7 +11,7 @@ public class Instrument
     public string? Region { get; set; }
     public string? Isin { get; set; }
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
-    
+
     public ICollection<Holding> Holdings { get; set; } = new List<Holding>();
     public ICollection<InvestmentTransaction> InvestmentTransactions { get; set; } = new List<InvestmentTransaction>();
 }

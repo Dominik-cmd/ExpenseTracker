@@ -5,7 +5,7 @@
 
   <!-- Mobile backdrop -->
   @if (isAuthenticated() && mobileSidebarOpen()) {
-    <div class="sidebar-backdrop" (click)="closeMobileSidebar()"></div>
+    <div class="sidebar-backdrop" (click)="closeMobileSidebar()" tabindex="0" (keydown.enter)="closeMobileSidebar()"></div>
   }
 
   <!-- Persistent sidebar -->
@@ -30,7 +30,7 @@
           <div class="nav-group">
             @if (showSidebarLabels()) {
               @if (group.collapsible) {
-                <div class="nav-group-header" (click)="toggleSection(group.label)">
+                <div class="nav-group-header" (click)="toggleSection(group.label)" tabindex="0" (keydown.enter)="toggleSection(group.label)">
                   <span class="nav-group-label">{{ group.label }}</span>
                   <i class="pi" [ngClass]="isSectionExpanded(group) ? 'pi-chevron-down' : 'pi-chevron-right'"></i>
                 </div>

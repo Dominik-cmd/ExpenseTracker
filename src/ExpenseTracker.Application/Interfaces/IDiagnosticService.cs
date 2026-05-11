@@ -4,5 +4,5 @@ namespace ExpenseTracker.Application.Interfaces;
 
 public interface IDiagnosticService
 {
-  DiagnosticParseResponse ParseSms(string text);
+    DiagnosticParseResponse ParseSms(string text);
 }
