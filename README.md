@@ -7,12 +7,14 @@ A self-hosted personal finance platform with AI-powered transaction categorizati
 ## Table of Contents
 
 - [Overview](#overview)
+- [Screenshots](#screenshots)
 - [Architecture](#architecture)
 - [Backend (API)](#backend-api)
 - [Frontend (Client)](#frontend-client)
 - [Hosting & Deployment](#hosting--deployment)
 - [Configuration Reference](#configuration-reference)
 - [Default User & First Login](#default-user--first-login)
+- [SMS Forwarding Setup](#sms-forwarding-setup)
 - [Development Setup](#development-setup)
 - [Project Structure](#project-structure)
 - [Implementing a Custom Bank Parser](#implementing-a-custom-bank-parser)
@@ -39,6 +41,15 @@ ExpenseTracker is a full-stack financial application built with:
 - AI-generated dashboard narratives (daily, monthly, yearly)
 - Multi-user with admin panel
 - CSV export, audit logging, rate limiting
+
+---
+
+## Screenshots
+
+![Dashboard](screenshots/dashboard.jpg)
+![Transactions](screenshots/transactions.jpg)
+![Monthly](screenshots/monthly.jpg)
+![Yearly](screenshots/yearly.jpg)
 
 ---
 
@@ -520,6 +531,180 @@ As admin, navigate to Admin → Users → Create User. Each user gets:
 - Their own LLM provider configuration
 - Their own investment provider setup
 - Isolated transaction data
+
+---
+
+## SMS Forwarding Setup
+
+There are two supported forwarding paths depending on your phone:
+
+| Path | Phone | Method | Reliability |
+|---|---|---|---|
+| **Android** | Android | SMS Forwarder app | ✅ Best |
+| **Mac bridge** | iPhone | Swift script reading chat.db | ✅ Good |
+| **iOS Shortcuts** | iPhone (no Mac) | Shortcuts automation | ⚠ Best-effort |
+
+---
+
+### Android Setup
+
+1. Install **[SMS to URL Forwarder](https://f-droid.org/en/packages/tech.bogomolov.incomingsmsgateway/)** from F-Droid (or Google Play: *Incoming SMS Webhook*)
+
+2. Open the app and add a new rule:
+
+   | Field | Value |
+   |---|---|
+   | Filter | \`OTP\` (matches any sender containing "OTP") |
+   | URL | \`https://your-domain.com/api/webhooks/sms\` |
+   | Method | POST |
+
+3. Set the request body template:
+   \`\`\`json
+   {"from":"%from%","text":"%text%","sentStamp":"%sentStamp%"}
+   \`\`\`
+   > ⚠️ The \`%sentStamp%\` placeholder **must** be wrapped in quotes as shown. Without quotes it sends an unquoted number and the backend will reject it.
+
+4. Add a header:
+   \`\`\`
+   X-Webhook-Secret: your-webhook-secret
+   \`\`\`
+
+5. **Disable battery optimization** for the forwarder app:
+   - Settings → Apps → SMS to URL Forwarder → Battery → Unrestricted
+   - Also disable "Pause app activity if unused" if present
+
+6. Send a test SMS to your number and verify it appears in the processing queue.
+
+---
+
+### Mac Setup (iPhone via Text Message Forwarding)
+
+The Mac setup involves a Swift binary that polls \`~/Library/Messages/chat.db\` every 2 minutes and forwards new messages to your webhook.
+
+#### Automated install (recommended)
+
+\`\`\`bash
+curl -fsSL https://raw.githubusercontent.com/Dominik-cmd/ExpenseTracker/main/scripts/install-mac-forwarder.sh \\
+  | bash -s -- \\
+    --webhook-url "https://your-domain.com/api/webhooks/sms" \\
+    --webhook-secret "your-webhook-secret"
+\`\`\`
+
+Or download and run interactively (will prompt for URL and secret):
+
+\`\`\`bash
+curl -fsSL https://raw.githubusercontent.com/Dominik-cmd/ExpenseTracker/main/scripts/install-mac-forwarder.sh \\
+  -o install-mac-forwarder.sh
+chmod +x install-mac-forwarder.sh
+./install-mac-forwarder.sh
+\`\`\`
+
+The script will:
+1. Check prerequisites (Xcode Command Line Tools)
+2. Prompt for your webhook URL and secret (if not passed as arguments)
+3. Write the Swift forwarder source to \`~/code/sms-forwarder/\`
+4. Compile the binary to \`~/bin/sms-forwarder\`
+5. Write a config file to \`~/.sms-forwarder.config.json\`
+6. Install and load a launchd agent (runs on boot, polls every 120s)
+7. Open System Settings to the Full Disk Access pane
+8. **Pause for you to grant Full Disk Access** (required — cannot be automated)
+9. Run a verification test
+
+#### Full Disk Access (required — manual step)
+
+After the script opens System Settings → Privacy & Security → Full Disk Access:
+
+1. Click the **+** button
+2. Navigate to \`~/bin/\` and select \`sms-forwarder\`
+3. Toggle it **ON**
+4. Press Enter in the terminal to continue
+
+> Without Full Disk Access, the binary cannot read \`chat.db\` and will silently produce no output.
+
+#### iPhone Text Message Forwarding
+
+Enable SMS forwarding from your iPhone to the Mac:
+
+1. On iPhone: Settings → Messages → Text Message Forwarding
+2. Toggle on your Mac's name
+3. Enter the code shown on your Mac
+
+From this point, all SMS (including bank messages) received on the iPhone will appear in Messages.app on the Mac and be picked up by the forwarder.
+
+#### Verifying the Mac setup
+
+\`\`\`bash
+# Check the agent is running
+launchctl list | grep sms-forwarder
+
+# Watch the log in real time
+tail -f ~/Library/Logs/sms-forwarder.out.log
+
+# Manually trigger a forward run
+~/bin/sms-forwarder
+
+# Reset state to re-forward all historical messages
+echo '{"lastRowId": 0}' > ~/.sms-forwarder-state.json
+~/bin/sms-forwarder
+\`\`\`
+
+#### Managing the agent
+
+\`\`\`bash
+# Stop
+launchctl unload ~/Library/LaunchAgents/com.expense-tracker.sms-forwarder.plist
+
+# Start
+launchctl load ~/Library/LaunchAgents/com.expense-tracker.sms-forwarder.plist
+
+# Update webhook URL or secret
+nano ~/.sms-forwarder.config.json
+# Then reload the agent:
+launchctl unload ~/Library/LaunchAgents/com.expense-tracker.sms-forwarder.plist
+launchctl load ~/Library/LaunchAgents/com.expense-tracker.sms-forwarder.plist
+\`\`\`
+
+#### Multiple iPhones on one Mac
+
+If you need to forward SMS from two iPhones with different Apple IDs to the same Mac:
+
+1. Create a second macOS user account (System Settings → Users & Groups → Add User)
+2. Enable Fast User Switching (System Settings → Control Center → Fast User Switching)
+3. Log in to the second macOS user and sign into iMessage with the second Apple ID
+4. Run the install script again as the second user
+5. Keep both users logged in simultaneously via Fast User Switching
+
+Each macOS user runs its own independent forwarder instance with its own \`chat.db\`, config, and state file.
+
+---
+
+### iPhone Only (no Mac) — iOS Shortcuts
+
+If you don't have a Mac, you can use iOS Shortcuts as a best-effort forwarder.
+
+> ⚠️ **Less reliable than the Mac bridge.** Shortcuts may be delayed or skipped if the phone is in low-power mode or has restricted background activity. No historical catch-up if messages are missed.
+
+1. Open **Shortcuts** on iPhone
+2. Go to **Automation** → **+** → **New Automation**
+3. Trigger: **Message received**
+   - From: \`OTP\` (or leave blank and filter in the action)
+   - Enable "Run Immediately" (disables the "Run?" prompt)
+4. Add actions:
+   - **Get Details of Message** → Message Contents + Sender
+   - **Get Current Date** → formatted as Unix timestamp
+   - **Get Contents of URL**:
+     - URL: \`https://your-domain.com/api/webhooks/sms\`
+     - Method: POST
+     - Headers: \`X-Webhook-Secret: your-secret\`, \`Content-Type: application/json\`
+     - Body (JSON):
+       \`\`\`json
+       {
+         "from": "[Sender from step above]",
+         "text": "[Message Contents from step above]",
+         "sentStamp": "[Timestamp from step above]"
+       }
+       \`\`\`
+5. Save the automation
 
 ---
 
