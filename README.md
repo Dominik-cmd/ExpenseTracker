@@ -860,4 +860,10 @@ Key logged events: auth attempts, transaction CRUD, SMS processing, LLM calls, i
 
 ## License
 
-Private project. Not licensed for redistribution.
+## 📄 License
+
+This project is licensed under the **PolyForm Noncommercial License 1.0.0**.
+
+*   **You are free to:** Download, modify, and use this software for personal, self-hosted purposes or within a non-profit organization.
+*   **You may not:** Use this software for any commercial purposes. This includes selling the software, offering it as a managed or paid SaaS platform, or using it to generate revenue in any capacity.
+*   **No Warranty:** This software is provided "as is", without warranty of any kind. You are solely responsible for verifying the accuracy of the parsed financial data.
