@@ -860,8 +860,6 @@ Key logged events: auth attempts, transaction CRUD, SMS processing, LLM calls, i
 
 ## License
 
-## 📄 License
-
 This project is licensed under the **PolyForm Noncommercial License 1.0.0**.
 
 *   **You are free to:** Download, modify, and use this software for personal, self-hosted purposes or within a non-profit organization.
