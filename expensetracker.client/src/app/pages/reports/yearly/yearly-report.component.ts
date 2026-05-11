@@ -12,7 +12,7 @@ import { Category, NarrativeResponse, YearlyReport } from '../../../core/models'
 import { AnalyticsService } from '../../../core/services/analytics.service';
 import { CategoryService } from '../../../core/services/category.service';
 import { CategoryEvolutionChartComponent } from './category-evolution-chart.component';
-import { SpendingHeatmapComponent } from './spending-heatmap.component';
+import { MonthCategoryGridComponent } from './month-category-grid.component';
 import { AppCurrencyPipe } from '../../../shared';
 
 const currentYear = new Date().getFullYear();
@@ -28,7 +28,7 @@ const FALLBACK_CATEGORY_COLOR = '#94a3b8';
     InputTextModule,
     TableModule,
     CategoryEvolutionChartComponent,
-    SpendingHeatmapComponent,
+    MonthCategoryGridComponent,
     AppCurrencyPipe
   ],
   template: `
@@ -82,8 +82,10 @@ const FALLBACK_CATEGORY_COLOR = '#94a3b8';
           [categoryColorMap]="categoryColors()"></app-category-evolution-chart>
       </p-card>
 
-      <p-card header="Spending heatmap" subheader="Daily spending intensity across the selected year.">
-        <app-spending-heatmap [data]="report().calendarHeatmap" [year]="selectedYear()"></app-spending-heatmap>
+      <p-card header="Month × category">
+        <app-month-category-grid
+          [monthlyCategories]="report().monthlyCategories"
+          [categoryEvolution]="report().categoryEvolution"></app-month-category-grid>
       </p-card>
 
       <p-card header="Largest transactions">
