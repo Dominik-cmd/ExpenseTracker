@@ -77,7 +77,7 @@ export class AllocationChartComponent {
   protected readonly chartOptions = computed<EChartsOption>(() => ({
     tooltip: {
       trigger: 'item',
-      formatter: /* eslint-disable-next-line @typescript-eslint/no-explicit-any */ (params: any) => `${params.name}<br/>€${Number(params.value).toLocaleString('en', { maximumFractionDigits: 0 })} (${params.percent}%)`
+      formatter: (params: any) => `${params.name}<br/>€${Number(params.value).toLocaleString('en', { maximumFractionDigits: 0 })} (${params.percent}%)`
     },
     legend: { bottom: 0, type: 'scroll' },
     series: [
