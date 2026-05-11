@@ -1,0 +1,29 @@
+namespace ExpenseTracker.Application.Models;
+
+public sealed record CategoryDto(
+  Guid Id,
+  string Name,
+  string? Color,
+  string? Icon,
+  int SortOrder,
+  bool IsSystem,
+  bool ExcludeFromExpenses,
+  bool ExcludeFromIncome,
+  Guid? ParentCategoryId,
+  List<CategoryDto> SubCategories);
+
+public sealed record CreateCategoryRequest(
+  string Name,
+  string? Color,
+  string? Icon,
+  Guid? ParentCategoryId);
+
+public sealed record UpdateCategoryRequest(
+  string? Name,
+  string? Color,
+  string? Icon,
+  int? SortOrder,
+  bool? ExcludeFromExpenses,
+  bool? ExcludeFromIncome);
+
+public sealed record DeleteCategoryRequest(Guid ReassignToCategoryId);

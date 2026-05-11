@@ -1,0 +1,109 @@
+<div class="app-shell"
+     [class.has-sidebar]="isAuthenticated()"
+     [class.sidebar-collapsed]="sidebarCollapsed()"
+     [class.mobile-sidebar-open]="mobileSidebarOpen()">
+
+  <!-- Mobile backdrop -->
+  @if (isAuthenticated() && mobileSidebarOpen()) {
+    <div class="sidebar-backdrop" (click)="closeMobileSidebar()"></div>
+  }
+
+  <!-- Persistent sidebar -->
+  @if (isAuthenticated()) {
+    <aside class="app-sidebar">
+      <div class="sidebar-header">
+        @if (showSidebarLabels()) {
+          <div class="sidebar-brand">
+            <div class="text-sm text-color-secondary">Signed in as</div>
+            <div class="font-semibold">{{ username() }}</div>
+          </div>
+        }
+        <p-button
+          [icon]="isMobile() ? 'pi pi-times' : (sidebarCollapsed() ? 'pi pi-angle-right' : 'pi pi-angle-left')"
+          [text]="true"
+          severity="secondary"
+          (onClick)="toggleSidebar()"></p-button>
+      </div>
+
+      <nav class="nav-links">
+        @for (group of navGroups(); track group.label) {
+          <div class="nav-group">
+            @if (showSidebarLabels()) {
+              @if (group.collapsible) {
+                <div class="nav-group-header" (click)="toggleSection(group.label)">
+                  <span class="nav-group-label">{{ group.label }}</span>
+                  <i class="pi" [ngClass]="isSectionExpanded(group) ? 'pi-chevron-down' : 'pi-chevron-right'"></i>
+                </div>
+              } @else {
+                <div class="nav-group-header nav-group-header--static">
+                  <span class="nav-group-label">{{ group.label }}</span>
+                </div>
+              }
+            }
+
+            @if (isSectionExpanded(group)) {
+              @for (item of group.items; track item.route) {
+                <a
+                  [routerLink]="item.route"
+                  routerLinkActive="active"
+                  [routerLinkActiveOptions]="{ exact: true }"
+                  class="nav-link"
+                  [title]="showSidebarLabels() ? '' : item.label">
+                  <i [class]="item.icon"></i>
+                  @if (showSidebarLabels()) {
+                    <span class="nav-label">{{ item.label }}</span>
+                  }
+                </a>
+              }
+            }
+          </div>
+        }
+      </nav>
+    </aside>
+  }
+
+  <!-- Main area -->
+  <div class="app-main">
+    <header class="app-topbar">
+      <div class="topbar-left">
+        @if (isAuthenticated()) {
+          <p-button
+            class="mobile-menu-btn"
+            icon="pi pi-bars"
+            [text]="true"
+            severity="secondary"
+            (onClick)="toggleSidebar()"></p-button>
+        }
+        <div>
+          <div class="app-title">Expense Tracker</div>
+          <div class="app-subtitle">
+            {{ isAuthenticated() ? 'Personal finance command center' : 'Secure sign in' }}
+          </div>
+        </div>
+      </div>
+
+      <div class="topbar-actions">
+        <div class="theme-toggle">
+          <i class="pi" [ngClass]="darkMode() ? 'pi-moon' : 'pi-sun'"></i>
+          <p-toggleSwitch [ngModel]="darkMode()" (ngModelChange)="darkMode.set($event)"></p-toggleSwitch>
+        </div>
+
+        @if (isAuthenticated()) {
+          <p-button
+            label="Logout"
+            icon="pi pi-sign-out"
+            severity="secondary"
+            [outlined]="true"
+            (onClick)="logout()"></p-button>
+        }
+      </div>
+    </header>
+
+    <main class="app-content">
+      <router-outlet></router-outlet>
+    </main>
+  </div>
+
+  <p-toast position="top-right"></p-toast>
+  <p-confirmDialog [style]="{ width: '28rem' }"></p-confirmDialog>
+</div>

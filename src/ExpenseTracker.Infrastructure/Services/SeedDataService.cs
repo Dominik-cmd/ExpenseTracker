@@ -1,0 +1,645 @@
+using System.Security.Cryptography;
+using System.Text.Json;
+using ExpenseTracker.Core.Entities;
+using ExpenseTracker.Core.Enums;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+namespace ExpenseTracker.Infrastructure;
+
+public sealed class SeedDataService : IHostedService, ExpenseTracker.Application.Interfaces.ISeedDataService
+{
+    private const string DefaultInitialPassword = "ChangeMeNow!";
+
+    private readonly AppDbContext _dbContext;
+    private readonly ILogger<SeedDataService> _logger;
+
+    public SeedDataService(AppDbContext dbContext, ILogger<SeedDataService> logger)
+    {
+        _dbContext = dbContext;
+        _logger = logger;
+    }
+
+    public Task StartAsync(CancellationToken cancellationToken) => SeedAsync(cancellationToken);
+
+    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
+
+    public async Task SeedAsync(CancellationToken cancellationToken = default)
+    {
+        var initialPassword = Environment.GetEnvironmentVariable("INITIAL_PASSWORD");
+        if (string.IsNullOrWhiteSpace(initialPassword))
+        {
+            initialPassword = DefaultInitialPassword;
+            _logger.LogWarning("INITIAL_PASSWORD was not configured. Using the default bootstrap password.");
+        }
+
+        await MigrateColumnsAsync(cancellationToken);
+        var user = await SeedUserAsync(initialPassword, cancellationToken);
+        if (user is not null)
+        {
+            await SeedForUserAsync(user, cancellationToken);
+        }
+
+        // Seed investment providers for users created before this feature.
+        var existingUserIds = user is null
+            ? await _dbContext.Users.Select(existingUser => existingUser.Id).ToListAsync(cancellationToken)
+            : await _dbContext.Users
+                .Where(existingUser => existingUser.Id != user.Id)
+                .Select(existingUser => existingUser.Id)
+                .ToListAsync(cancellationToken);
+
+        foreach (var existingUserId in existingUserIds)
+        {
+            await SeedInvestmentProvidersAsync(existingUserId, cancellationToken);
+        }
+
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    public async Task SeedForUserAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var user = await _dbContext.Users.FindAsync([userId], cancellationToken);
+        if (user is not null)
+        {
+            await SeedForUserAsync(user, cancellationToken);
+        }
+    }
+
+    public async Task SeedForUserAsync(User user, CancellationToken cancellationToken = default)
+    {
+        await SeedCategoriesAsync(user.Id, cancellationToken);
+        await SeedLlmProvidersAsync(user.Id, cancellationToken);
+        await SeedSettingsAsync(user.Id, cancellationToken);
+        await SeedInvestmentProvidersAsync(user.Id, cancellationToken);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+    }
+
+    private async Task MigrateColumnsAsync(CancellationToken cancellationToken)
+    {
+        // Skip raw SQL migrations for non-PostgreSQL providers (e.g. InMemory for tests)
+        if (!_dbContext.Database.ProviderName?.Contains("Npgsql", StringComparison.OrdinalIgnoreCase) ?? true)
+        {
+            return;
+        }
+
+        // Existing column migrations
+        await _dbContext.Database.ExecuteSqlRawAsync(
+            "ALTER TABLE categories ADD COLUMN IF NOT EXISTS exclude_from_expenses BOOLEAN NOT NULL DEFAULT FALSE",
+            cancellationToken);
+        await _dbContext.Database.ExecuteSqlRawAsync(
+            "ALTER TABLE categories ADD COLUMN IF NOT EXISTS exclude_from_income BOOLEAN NOT NULL DEFAULT FALSE",
+            cancellationToken);
+
+        // Add is_admin column to users and make first user admin
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            DO $$
+            BEGIN
+              IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='is_admin') THEN
+                ALTER TABLE users ADD COLUMN is_admin BOOLEAN NOT NULL DEFAULT FALSE;
+                UPDATE users SET is_admin = TRUE WHERE id = (SELECT id FROM users ORDER BY created_at LIMIT 1);
+              END IF;
+            END $$;
+            """, cancellationToken);
+
+        // Multi-user migration: add user_id to all user-scoped tables, backfill with first user
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            DO $$
+            DECLARE first_user_id UUID;
+            DECLARE settings_pk_name TEXT;
+            BEGIN
+              SELECT id INTO first_user_id FROM users ORDER BY created_at LIMIT 1;
+
+              -- categories
+              IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='categories' AND column_name='user_id') THEN
+                ALTER TABLE categories ADD COLUMN user_id UUID;
+                IF first_user_id IS NOT NULL THEN
+                  UPDATE categories SET user_id = first_user_id;
+                END IF;
+                ALTER TABLE categories ALTER COLUMN user_id SET NOT NULL;
+                ALTER TABLE categories ADD CONSTRAINT fk_categories_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+              END IF;
+
+              -- merchant_rules
+              IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='merchant_rules' AND column_name='user_id') THEN
+                ALTER TABLE merchant_rules ADD COLUMN user_id UUID;
+                IF first_user_id IS NOT NULL THEN
+                  UPDATE merchant_rules SET user_id = first_user_id;
+                END IF;
+                ALTER TABLE merchant_rules ALTER COLUMN user_id SET NOT NULL;
+                ALTER TABLE merchant_rules ADD CONSTRAINT fk_merchant_rules_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+              END IF;
+
+              -- raw_messages
+              IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='raw_messages' AND column_name='user_id') THEN
+                ALTER TABLE raw_messages ADD COLUMN user_id UUID;
+                IF first_user_id IS NOT NULL THEN
+                  UPDATE raw_messages SET user_id = first_user_id;
+                END IF;
+                ALTER TABLE raw_messages ALTER COLUMN user_id SET NOT NULL;
+                ALTER TABLE raw_messages ADD CONSTRAINT fk_raw_messages_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+              END IF;
+
+              -- llm_call_logs
+              IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='llm_call_logs' AND column_name='user_id') THEN
+                ALTER TABLE llm_call_logs ADD COLUMN user_id UUID;
+                IF first_user_id IS NOT NULL THEN
+                  UPDATE llm_call_logs SET user_id = first_user_id;
+                END IF;
+                ALTER TABLE llm_call_logs ALTER COLUMN user_id SET NOT NULL;
+              END IF;
+
+              -- llm_providers
+              IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='llm_providers' AND column_name='user_id') THEN
+                ALTER TABLE llm_providers ADD COLUMN user_id UUID;
+                IF first_user_id IS NOT NULL THEN
+                  UPDATE llm_providers SET user_id = first_user_id;
+                END IF;
+                ALTER TABLE llm_providers ALTER COLUMN user_id SET NOT NULL;
+                ALTER TABLE llm_providers ADD CONSTRAINT fk_llm_providers_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+              END IF;
+
+              -- settings: needs PK change from (key) to (key, user_id)
+              IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='settings' AND column_name='user_id') THEN
+                ALTER TABLE settings ADD COLUMN user_id UUID;
+                IF first_user_id IS NOT NULL THEN
+                  UPDATE settings SET user_id = first_user_id;
+                END IF;
+                ALTER TABLE settings ALTER COLUMN user_id SET NOT NULL;
+                SELECT conname INTO settings_pk_name
+                  FROM pg_constraint
+                  WHERE conrelid = 'settings'::regclass AND contype = 'p';
+                IF settings_pk_name IS NOT NULL THEN
+                  EXECUTE 'ALTER TABLE settings DROP CONSTRAINT ' || quote_ident(settings_pk_name);
+                END IF;
+                ALTER TABLE settings ADD PRIMARY KEY (key, user_id);
+                ALTER TABLE settings ADD CONSTRAINT fk_settings_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE;
+              END IF;
+            END $$;
+            """, cancellationToken);
+
+        // Update unique indexes to include user_id
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            DO $$
+            BEGIN
+              -- merchant_rules: change unique(merchant_normalized) -> unique(user_id, merchant_normalized)
+              IF EXISTS (SELECT 1 FROM pg_indexes WHERE lower(indexname)='ix_merchant_rules_merchant_normalized') THEN
+                DROP INDEX IF EXISTS ix_merchant_rules_merchant_normalized;
+                DROP INDEX IF EXISTS "IX_merchant_rules_merchant_normalized";
+              END IF;
+              IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE lower(indexname)='ix_merchant_rules_user_id_merchant_normalized') THEN
+                CREATE UNIQUE INDEX ix_merchant_rules_user_id_merchant_normalized ON merchant_rules (user_id, merchant_normalized);
+              END IF;
+
+              -- categories: change unique(name, parent_category_id) -> unique(user_id, name, parent_category_id)
+              IF EXISTS (SELECT 1 FROM pg_indexes WHERE lower(indexname)='ix_categories_name_parent_category_id') THEN
+                DROP INDEX IF EXISTS ix_categories_name_parent_category_id;
+                DROP INDEX IF EXISTS "IX_categories_name_parent_category_id";
+              END IF;
+              IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE lower(indexname)='ix_categories_user_id_name_parent_category_id') THEN
+                CREATE UNIQUE INDEX ix_categories_user_id_name_parent_category_id ON categories (user_id, name, parent_category_id) WHERE parent_category_id IS NOT NULL;
+              END IF;
+              IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE lower(indexname)='ix_categories_user_id_name') THEN
+                CREATE UNIQUE INDEX ix_categories_user_id_name ON categories (user_id, name) WHERE parent_category_id IS NULL;
+              END IF;
+
+              -- llm_providers: change unique(is_enabled) -> unique(user_id, is_enabled)
+              IF EXISTS (SELECT 1 FROM pg_indexes WHERE lower(indexname)='ix_llm_providers_is_enabled') THEN
+                DROP INDEX IF EXISTS ix_llm_providers_is_enabled;
+                DROP INDEX IF EXISTS "IX_llm_providers_is_enabled";
+              END IF;
+              IF NOT EXISTS (SELECT 1 FROM pg_indexes WHERE lower(indexname)='ix_llm_providers_user_id_is_enabled') THEN
+                CREATE UNIQUE INDEX ix_llm_providers_user_id_is_enabled ON llm_providers (user_id) WHERE is_enabled = true;
+              END IF;
+            END $$;
+            """, cancellationToken);
+
+        await _dbContext.Database.ExecuteSqlRawAsync(
+            "ALTER TABLE llm_call_logs ADD COLUMN IF NOT EXISTS purpose text NOT NULL DEFAULT 'categorize';",
+            cancellationToken);
+
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS summaries (
+                id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                summary_type text NOT NULL,
+                scope text NOT NULL,
+                cache_key text NOT NULL,
+                content text NOT NULL,
+                input_snapshot text NOT NULL DEFAULT '',
+                model_used text NOT NULL DEFAULT '',
+                provider_used text NOT NULL DEFAULT '',
+                tokens_used int,
+                user_id uuid NOT NULL,
+                generated_at timestamptz NOT NULL DEFAULT now()
+            );
+
+            CREATE UNIQUE INDEX IF NOT EXISTS ix_summaries_lookup ON summaries (user_id, summary_type, scope, cache_key);
+            CREATE INDEX IF NOT EXISTS ix_summaries_scope ON summaries (user_id, summary_type, scope, generated_at DESC);
+            CREATE INDEX IF NOT EXISTS ix_summaries_user_id ON summaries (user_id);
+            """, cancellationToken);
+
+        // Backfill canonical colors for all top-level categories across all users
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            UPDATE categories
+            SET color = CASE name
+                WHEN 'Housing'       THEN '#6366f1'
+                WHEN 'Utilities'     THEN '#0ea5e9'
+                WHEN 'Groceries'     THEN '#10b981'
+                WHEN 'Dining'        THEN '#f97316'
+                WHEN 'Transportation'THEN '#3b82f6'
+                WHEN 'Fuel'          THEN '#eab308'
+                WHEN 'Healthcare'    THEN '#ef4444'
+                WHEN 'Insurance'     THEN '#8b5cf6'
+                WHEN 'Entertainment' THEN '#ec4899'
+                WHEN 'Subscriptions' THEN '#14b8a6'
+                WHEN 'Shopping'      THEN '#f59e0b'
+                WHEN 'Education'     THEN '#06b6d4'
+                WHEN 'Personal Care' THEN '#a855f7'
+                WHEN 'Gifts'         THEN '#f43f5e'
+                WHEN 'Travel'        THEN '#84cc16'
+                WHEN 'Savings'       THEN '#22c55e'
+                WHEN 'Investments'   THEN '#2dd4bf'
+                WHEN 'Taxes'         THEN '#64748b'
+                WHEN 'Income'        THEN '#10b981'
+                WHEN 'Uncategorized' THEN '#94a3b8'
+            END,
+            updated_at = NOW()
+            WHERE name IN (
+                'Housing','Utilities','Groceries','Dining','Transportation','Fuel',
+                'Healthcare','Insurance','Entertainment','Subscriptions','Shopping',
+                'Education','Personal Care','Gifts','Travel','Savings','Investments',
+                'Taxes','Income','Uncategorized'
+            )
+            AND parent_category_id IS NULL;
+            """, cancellationToken);
+
+        // Ensure "Misc Income" subcategory exists under "Income" for all users
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            INSERT INTO categories (id, user_id, name, parent_category_id, color, sort_order, is_system, exclude_from_expenses, exclude_from_income, created_at, updated_at)
+            SELECT gen_random_uuid(), income.user_id, 'Misc Income', income.id, '#f472b6', 99, false, false, true, NOW(), NOW()
+            FROM categories income
+            WHERE income.name = 'Income'
+              AND income.parent_category_id IS NULL
+              AND NOT EXISTS (
+                SELECT 1 FROM categories c
+                WHERE c.user_id = income.user_id
+                  AND c.name = 'Misc Income'
+                  AND c.parent_category_id = income.id
+              );
+            """, cancellationToken);
+
+        // Ensure existing "Misc Income" categories are excluded from income
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            UPDATE categories
+            SET exclude_from_income = true, updated_at = NOW()
+            WHERE name = 'Misc Income'
+              AND parent_category_id IS NOT NULL
+              AND exclude_from_income = false;
+            """, cancellationToken);
+
+        // ── Investment tables ──
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS investment_providers (
+                id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                provider_type text NOT NULL,
+                display_name text NOT NULL,
+                api_token_encrypted text,
+                extra_config jsonb,
+                is_enabled boolean NOT NULL DEFAULT false,
+                last_sync_at timestamptz,
+                last_sync_status text,
+                last_sync_error text,
+                last_test_at timestamptz,
+                last_test_status text,
+                last_test_error text,
+                created_at timestamptz NOT NULL DEFAULT now(),
+                updated_at timestamptz NOT NULL DEFAULT now()
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ix_investment_providers_user_provider
+                ON investment_providers (user_id, provider_type);
+            """, cancellationToken);
+
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS investment_accounts (
+                id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                provider_id uuid NOT NULL REFERENCES investment_providers(id) ON DELETE CASCADE,
+                user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                external_account_id text,
+                display_name text NOT NULL,
+                account_type text NOT NULL,
+                base_currency text NOT NULL DEFAULT 'EUR',
+                icon text,
+                color text,
+                is_active boolean NOT NULL DEFAULT true,
+                sort_order int NOT NULL DEFAULT 0,
+                notes text,
+                created_at timestamptz NOT NULL DEFAULT now(),
+                updated_at timestamptz NOT NULL DEFAULT now()
+            );
+            """, cancellationToken);
+
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS instruments (
+                id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                symbol text NOT NULL,
+                name text,
+                asset_class text NOT NULL,
+                currency text NOT NULL,
+                sector text,
+                region text,
+                isin text,
+                created_at timestamptz NOT NULL DEFAULT now()
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ix_instruments_symbol_class_currency
+                ON instruments (symbol, asset_class, currency);
+            """, cancellationToken);
+
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS holdings (
+                id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                account_id uuid NOT NULL REFERENCES investment_accounts(id) ON DELETE CASCADE,
+                instrument_id uuid NOT NULL REFERENCES instruments(id),
+                quantity decimal(18,4) NOT NULL,
+                cost_basis_per_share decimal(18,4),
+                mark_price decimal(18,4),
+                market_value decimal(18,4) NOT NULL,
+                unrealized_pnl decimal(18,4),
+                unrealized_pnl_percent decimal(10,4),
+                currency text NOT NULL,
+                as_of timestamptz NOT NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ix_holdings_account_instrument
+                ON holdings (account_id, instrument_id);
+            """, cancellationToken);
+
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS investment_transactions (
+                id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                account_id uuid NOT NULL REFERENCES investment_accounts(id) ON DELETE CASCADE,
+                instrument_id uuid REFERENCES instruments(id),
+                external_transaction_id text NOT NULL,
+                transaction_type text NOT NULL,
+                transaction_date timestamptz NOT NULL,
+                quantity decimal(18,4),
+                price decimal(18,4),
+                gross_amount decimal(18,4),
+                commission decimal(18,4) DEFAULT 0,
+                net_amount decimal(18,4) NOT NULL,
+                currency text NOT NULL,
+                description text,
+                created_at timestamptz NOT NULL DEFAULT now()
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ix_investment_txn_account_external
+                ON investment_transactions (account_id, external_transaction_id);
+            CREATE INDEX IF NOT EXISTS ix_investment_txn_date
+                ON investment_transactions (transaction_date);
+            """, cancellationToken);
+
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS manual_account_balances (
+                id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                account_id uuid NOT NULL UNIQUE REFERENCES investment_accounts(id) ON DELETE CASCADE,
+                balance decimal(18,4) NOT NULL,
+                currency text NOT NULL,
+                updated_at timestamptz NOT NULL DEFAULT now()
+            );
+            """, cancellationToken);
+
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS manual_balance_history (
+                id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                account_id uuid NOT NULL REFERENCES investment_accounts(id) ON DELETE CASCADE,
+                balance decimal(18,4) NOT NULL,
+                currency text NOT NULL,
+                recorded_at timestamptz NOT NULL DEFAULT now(),
+                note text
+            );
+            CREATE INDEX IF NOT EXISTS ix_manual_balance_history_account_date
+                ON manual_balance_history (account_id, recorded_at DESC);
+            """, cancellationToken);
+
+        await _dbContext.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS portfolio_history (
+                id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+                account_id uuid NOT NULL REFERENCES investment_accounts(id) ON DELETE CASCADE,
+                snapshot_date date NOT NULL,
+                market_value decimal(18,4) NOT NULL,
+                currency text NOT NULL,
+                source text NOT NULL
+            );
+            CREATE UNIQUE INDEX IF NOT EXISTS ix_portfolio_history_account_date
+                ON portfolio_history (account_id, snapshot_date);
+            """, cancellationToken);
+    }
+
+    private async Task<User?> SeedUserAsync(string initialPassword, CancellationToken cancellationToken)
+    {
+        var initialUsername = Environment.GetEnvironmentVariable("INITIAL_USERNAME");
+        if (string.IsNullOrWhiteSpace(initialUsername))
+        {
+            initialUsername = "admin";
+        }
+
+        var existingUser = await _dbContext.Users.SingleOrDefaultAsync(user => user.Username == initialUsername, cancellationToken);
+        if (existingUser is not null)
+        {
+            return existingUser;
+        }
+
+        var newUser = new User
+        {
+            Username = initialUsername,
+            IsAdmin = true,
+            PasswordHash = BCrypt.Net.BCrypt.HashPassword(initialPassword, workFactor: 12)
+        };
+        _dbContext.Users.Add(newUser);
+        await _dbContext.SaveChangesAsync(cancellationToken);
+        return newUser;
+    }
+
+    private async Task SeedCategoriesAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var existingCategories = await _dbContext.Categories
+            .Where(c => c.UserId == userId)
+            .ToDictionaryAsync(category => (category.Name, category.ParentCategoryId), cancellationToken);
+
+        var topLevelDefinitions = new (string Name, int SortOrder, bool IsSystem, string Color)[]
+        {
+            ("Housing",        1,  false, "#6366f1"),
+            ("Utilities",      2,  false, "#0ea5e9"),
+            ("Groceries",      3,  false, "#10b981"),
+            ("Dining",         4,  false, "#f97316"),
+            ("Transportation", 5,  false, "#3b82f6"),
+            ("Fuel",           6,  false, "#eab308"),
+            ("Healthcare",     7,  false, "#ef4444"),
+            ("Insurance",      8,  false, "#8b5cf6"),
+            ("Entertainment",  9,  false, "#ec4899"),
+            ("Subscriptions",  10, false, "#14b8a6"),
+            ("Shopping",       11, false, "#f59e0b"),
+            ("Education",      12, false, "#06b6d4"),
+            ("Personal Care",  13, false, "#a855f7"),
+            ("Gifts",          14, false, "#f43f5e"),
+            ("Travel",         15, false, "#84cc16"),
+            ("Savings",        16, false, "#22c55e"),
+            ("Investments",    17, false, "#2dd4bf"),
+            ("Taxes",          18, false, "#64748b"),
+            ("Income",         19, true,  "#10b981"),
+            ("Uncategorized",  99, true,  "#94a3b8")
+        };
+
+        foreach (var definition in topLevelDefinitions)
+        {
+            if (existingCategories.ContainsKey((definition.Name, null)))
+            {
+                continue;
+            }
+
+            var category = new Category
+            {
+                UserId = userId,
+                Name = definition.Name,
+                Color = definition.Color,
+                SortOrder = definition.SortOrder,
+                IsSystem = definition.IsSystem
+            };
+
+            _dbContext.Categories.Add(category);
+            existingCategories[(definition.Name, null)] = category;
+        }
+
+        var subcategoryDefinitions = new (string Parent, string Name, int SortOrder, string? Color, bool ExcludeFromIncome)[]
+        {
+            ("Groceries", "Mercator", 1, null, false),
+            ("Groceries", "Hofer",    2, null, false),
+            ("Groceries", "Lidl",     3, null, false),
+            ("Groceries", "Spar",     4, null, false),
+            ("Groceries", "Tus",      5, null, false),
+            ("Fuel",      "Petrol",   1, null, false),
+            ("Fuel",      "OMV",      2, null, false),
+            ("Subscriptions", "Netflix", 1, null, false),
+            ("Subscriptions", "Spotify", 2, null, false),
+            ("Income",    "Misc Income", 99, "#f472b6", true)
+        };
+
+        foreach (var definition in subcategoryDefinitions)
+        {
+            if (!existingCategories.TryGetValue((definition.Parent, null), out var parentCategory) || existingCategories.ContainsKey((definition.Name, parentCategory.Id)))
+            {
+                continue;
+            }
+
+            var category = new Category
+            {
+                UserId = userId,
+                Name = definition.Name,
+                ParentCategoryId = parentCategory.Id,
+                Color = definition.Color,
+                SortOrder = definition.SortOrder,
+                ExcludeFromIncome = definition.ExcludeFromIncome
+            };
+
+            _dbContext.Categories.Add(category);
+            existingCategories[(definition.Name, parentCategory.Id)] = category;
+        }
+    }
+
+    private async Task SeedLlmProvidersAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var existingTypes = await _dbContext.LlmProviders
+            .Where(p => p.UserId == userId)
+            .Select(provider => provider.ProviderType)
+            .ToHashSetAsync(cancellationToken);
+
+        var providers = new (LlmProviderType Type, string Name, string Model)[]
+        {
+            (LlmProviderType.OpenAi, "OpenAI", "GPT-4o"),
+            (LlmProviderType.Anthropic, "Anthropic", "claude-sonnet-4-20250514"),
+            (LlmProviderType.Gemini, "Gemini", "gemini-2.0-flash")
+        };
+
+        foreach (var provider in providers)
+        {
+            if (existingTypes.Contains(provider.Type))
+            {
+                continue;
+            }
+
+            _dbContext.LlmProviders.Add(new LlmProvider
+            {
+                UserId = userId,
+                ProviderType = provider.Type,
+                Name = provider.Name,
+                Model = provider.Model,
+                IsEnabled = false,
+                ApiKeyEncrypted = null
+            });
+        }
+    }
+
+    private async Task SeedSettingsAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var existingKeys = await _dbContext.Settings
+            .Where(s => s.UserId == userId)
+            .Select(setting => setting.Key)
+            .ToHashSetAsync(cancellationToken);
+
+        if (!existingKeys.Contains("sms_webhook_secret"))
+        {
+            var secret = GenerateUrlSafeSecret();
+            _dbContext.Settings.Add(new Setting { Key = "sms_webhook_secret", UserId = userId, Value = secret });
+            _logger.LogInformation("Seeded sms_webhook_secret for user {UserId}", userId);
+        }
+
+        if (!existingKeys.Contains("sms_senders"))
+        {
+            _dbContext.Settings.Add(new Setting
+            {
+                Key = "sms_senders",
+                UserId = userId,
+                Value = JsonSerializer.Serialize(new[] { "OTP banka", "OTP", "OTP Banka" })
+            });
+        }
+    }
+
+    private async Task SeedInvestmentProvidersAsync(Guid userId, CancellationToken cancellationToken)
+    {
+        var existingTypes = await _dbContext.InvestmentProviders
+            .Where(p => p.UserId == userId)
+            .Select(p => p.ProviderType)
+            .ToHashSetAsync(cancellationToken);
+
+        if (!existingTypes.Contains(InvestmentProviderType.Ibkr))
+        {
+            _dbContext.InvestmentProviders.Add(new InvestmentProvider
+            {
+                UserId = userId,
+                ProviderType = InvestmentProviderType.Ibkr,
+                DisplayName = "Interactive Brokers",
+                IsEnabled = false,
+                LastSyncStatus = "never",
+                LastTestStatus = "untested"
+            });
+        }
+
+        if (!existingTypes.Contains(InvestmentProviderType.Manual))
+        {
+            _dbContext.InvestmentProviders.Add(new InvestmentProvider
+            {
+                UserId = userId,
+                ProviderType = InvestmentProviderType.Manual,
+                DisplayName = "Manual entries",
+                IsEnabled = false,
+                LastSyncStatus = "n/a",
+                LastTestStatus = "untested"
+            });
+        }
+    }
+
+    private static string GenerateUrlSafeSecret()
+    {
+        Span<byte> bytes = stackalloc byte[32];
+        RandomNumberGenerator.Fill(bytes);
+        return Convert.ToBase64String(bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_');
+    }
+}

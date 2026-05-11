@@ -1,0 +1,259 @@
+:host {
+  display: block;
+  min-height: 100vh;
+}
+
+.app-shell {
+  min-height: 100vh;
+  background: var(--app-surface-0);
+  color: var(--app-text-color);
+  display: flex;
+}
+
+/* Sidebar */
+.app-sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 260px;
+  background: var(--app-surface-1);
+  border-right: 1px solid var(--app-surface-border);
+  display: flex;
+  flex-direction: column;
+  z-index: 30;
+  transition: width 0.25s ease;
+  overflow-x: hidden;
+}
+
+.sidebar-collapsed .app-sidebar {
+  width: 60px;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border-bottom: 1px solid var(--app-surface-border);
+  min-height: 60px;
+}
+
+.sidebar-collapsed .sidebar-header {
+  justify-content: center;
+  padding: 1rem 0.5rem;
+}
+
+.sidebar-brand {
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+/* Main area */
+.app-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.has-sidebar .app-main {
+  margin-left: 260px;
+  transition: margin-left 0.25s ease;
+}
+
+.has-sidebar.sidebar-collapsed .app-main {
+  margin-left: 60px;
+}
+
+.app-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  backdrop-filter: blur(14px);
+  background: color-mix(in srgb, var(--app-surface-0) 88%, transparent);
+  border-bottom: 1px solid var(--app-surface-border);
+}
+
+.topbar-left,
+.topbar-actions,
+.theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+}
+
+.app-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.app-subtitle {
+  color: var(--app-text-muted);
+  font-size: 0.875rem;
+}
+
+.app-content {
+  padding: 1.5rem;
+  max-width: 1440px;
+  margin: 0 auto;
+}
+
+/* Navigation */
+.nav-links {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  margin-top: 0.5rem;
+  padding: 0 0.5rem;
+  overflow-y: auto;
+  flex: 1;
+}
+
+.nav-group {
+  margin-bottom: 0.5rem;
+}
+
+.nav-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 1rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-color-secondary);
+  cursor: pointer;
+  user-select: none;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+
+.nav-group-header:hover {
+  background: var(--surface-hover);
+}
+
+.nav-group-header--static {
+  cursor: default;
+}
+
+.nav-group-header--static:hover {
+  background: transparent;
+}
+
+.nav-group-label {
+  font-size: 0.7rem;
+}
+
+.nav-group-header i {
+  font-size: 0.7rem;
+  transition: transform 0.2s;
+}
+
+.nav-link {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  text-decoration: none;
+  color: inherit;
+  padding: 0.7rem 0.75rem;
+  border-radius: 0.65rem;
+  transition: background-color 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.nav-link i {
+  font-size: 1.1rem;
+  min-width: 1.2rem;
+  text-align: center;
+}
+
+.nav-link:hover,
+.nav-link.active {
+  background: var(--app-sidebar-active);
+}
+
+.sidebar-collapsed .nav-link {
+  justify-content: center;
+  padding: 0.7rem 0;
+}
+
+.nav-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.theme-toggle i {
+  color: var(--app-text-muted);
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .app-sidebar {
+    width: 260px;
+    transform: translateX(-260px);
+    transition: transform 0.25s ease;
+  }
+
+  .mobile-sidebar-open .app-sidebar {
+    transform: translateX(0);
+  }
+
+  /* On mobile the desktop collapsed state has no effect on width/position */
+  .sidebar-collapsed .app-sidebar {
+    width: 260px;
+    transform: translateX(-260px);
+  }
+
+  .mobile-sidebar-open.sidebar-collapsed .app-sidebar {
+    transform: translateX(0);
+  }
+
+  .has-sidebar .app-main,
+  .has-sidebar.sidebar-collapsed .app-main {
+    margin-left: 0;
+  }
+
+  .sidebar-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.45);
+    z-index: 29;
+    cursor: pointer;
+  }
+
+  .mobile-menu-btn {
+    display: inline-flex !important;
+  }
+
+  .app-topbar {
+    padding: 0.75rem 1rem;
+  }
+
+  .app-content {
+    padding: 1rem;
+  }
+
+  .app-title {
+    font-size: 1.1rem;
+  }
+
+  .app-subtitle {
+    display: none;
+  }
+}
+
+@media (min-width: 769px) {
+  .mobile-menu-btn {
+    display: none !important;
+  }
+
+  .sidebar-backdrop {
+    display: none;
+  }
+}
