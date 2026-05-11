@@ -97,7 +97,8 @@ export interface InvestmentProvider {
   providerType: string;
   displayName: string;
   token: string | null;
-  extraConfig: unknown;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  extraConfig: any;
   isEnabled: boolean;
   lastSyncAt: string | null;
   lastSyncStatus: string | null;
