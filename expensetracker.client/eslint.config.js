@@ -23,6 +23,7 @@ module.exports = defineConfig([
           style: "camelCase",
         },
       ],
+      "@typescript-eslint/no-explicit-any": "off",
       "@angular-eslint/no-output-native": "off",
       "@angular-eslint/component-selector": [
         "error",

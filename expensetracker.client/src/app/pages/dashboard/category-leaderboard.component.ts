@@ -127,7 +127,7 @@ export class CategoryLeaderboardComponent {
         formatter: (params: { dataIndex: number } | { dataIndex: number }[]) => {
           const point = Array.isArray(params) ? params[0] : params;
           const item = items[point.dataIndex];
-          return `${item.name}<br>${this.formatAmount(item.amount)} · ${item.percentage.toFixed(1)}%`;
+          return `${this.escapeHtml(item.name)}<br>${this.formatAmount(item.amount)} · ${item.percentage.toFixed(1)}%`;
         }
       },
       grid: { left: 8, right: 124, top: 8, bottom: 8, containLabel: true },
@@ -177,5 +177,14 @@ export class CategoryLeaderboardComponent {
     return amount >= 100
       ? this.wholeCurrencyFormatter().format(amount)
       : this.preciseCurrencyFormatter().format(amount);
+  }
+
+  private escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
   }
 }
