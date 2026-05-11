@@ -87,8 +87,10 @@ export class AuthService {
     );
   }
 
-  changePassword(request: ChangePasswordRequest): Observable<void> {
-    return this.http.post<void>(buildApiUrl('/api/auth/change-password'), request);
+  changePassword(request: ChangePasswordRequest): Observable<AuthSession> {
+    return this.http.post<LoginResponse>(buildApiUrl('/api/auth/change-password'), request).pipe(
+      map(response => this.storeSession(response))
+    );
   }
 
   isAuthenticated(): boolean {

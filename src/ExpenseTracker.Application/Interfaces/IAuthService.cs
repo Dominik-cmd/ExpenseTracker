@@ -7,5 +7,5 @@ public interface IAuthService
   Task<LoginResponse?> LoginAsync(LoginRequest request, CancellationToken ct);
   Task<LoginResponse?> RefreshAsync(string refreshToken, CancellationToken ct);
   Task LogoutAsync(Guid userId, CancellationToken ct);
-  Task<bool> ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken ct);
+  Task<LoginResponse?> ChangePasswordAsync(Guid userId, ChangePasswordRequest request, CancellationToken ct);
 }

@@ -53,33 +53,31 @@ public sealed class AuthService(
     logger.LogDebug("User {UserId} refresh token revoked", userId);
   }
 
-  public async Task<bool> ChangePasswordAsync(
+  public async Task<LoginResponse?> ChangePasswordAsync(
     Guid userId, ChangePasswordRequest request, CancellationToken ct)
   {
     if (string.IsNullOrWhiteSpace(request.NewPassword) || request.NewPassword.Length < 8)
     {
-      return false;
+      return null;
     }
 
     var user = await userRepository.GetByIdAsync(userId, ct);
     if (user is null)
     {
-      return false;
+      return null;
     }
 
     if (!BCrypt.Net.BCrypt.Verify(request.CurrentPassword, user.PasswordHash))
     {
       logger.LogWarning("Password change failed for user {UserId}: incorrect current password", userId);
-      return false;
+      return null;
     }
 
     user.PasswordHash = BCrypt.Net.BCrypt.HashPassword(request.NewPassword, workFactor: 12);
-    user.RefreshTokenHash = null;
-    user.RefreshTokenExpiresAt = null;
     user.UpdatedAt = DateTime.UtcNow;
     await userRepository.SaveChangesAsync(ct);
     logger.LogInformation("User {UserId} password changed successfully", userId);
-    return true;
+    return await IssueTokensAsync(user, ct);
   }
 
   private async Task<LoginResponse> IssueTokensAsync(

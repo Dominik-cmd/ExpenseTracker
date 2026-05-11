@@ -56,7 +56,7 @@ public sealed class AuthController(
 
   [Authorize]
   [HttpPost("change-password")]
-  public async Task<IActionResult> ChangePasswordAsync(
+  public async Task<ActionResult<LoginResponse>> ChangePasswordAsync(
     [FromBody] ChangePasswordRequest request, CancellationToken ct)
   {
     var userId = GetCurrentUserId();
@@ -64,13 +64,13 @@ public sealed class AuthController(
     {
       return Unauthorized();
     }
-    var success = await authService.ChangePasswordAsync(userId.Value, request, ct);
-    if (!success)
+    var result = await authService.ChangePasswordAsync(userId.Value, request, ct);
+    if (result is null)
     {
       logger.LogWarning("Failed password change attempt for user {UserId}", userId.Value);
-      return BadRequest(new { message = "Current password is incorrect." });
+      return BadRequest(new { message = "Current password is incorrect or new password is too short (min 8 chars)." });
     }
     logger.LogInformation("User {UserId} changed password successfully", userId.Value);
-    return NoContent();
+    return Ok(result);
   }
 }

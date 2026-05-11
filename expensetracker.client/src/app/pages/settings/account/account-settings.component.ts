@@ -134,8 +134,10 @@ export class AccountSettingsComponent {
       finalize(() => this.changingPassword.set(false)),
       takeUntilDestroyed(this.destroyRef)
     ).subscribe(() => {
-      this.messageService.add({ severity: 'success', summary: 'Password changed', detail: 'Please sign in again with your new password.' });
-      this.authService.clearSession();
+      this.messageService.add({ severity: 'success', summary: 'Password changed', detail: 'Your password has been updated.' });
+      this.currentPassword = '';
+      this.newPassword = '';
+      this.confirmPassword = '';
     });
   }
 }
