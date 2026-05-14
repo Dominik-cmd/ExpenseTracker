@@ -15,33 +15,33 @@ public sealed class LlmLogsTests(CustomWebApplicationFactory factory) : Integrat
         {
             dbContext.LlmCallLogs.AddRange(
           new LlmCallLog
-            {
-                Id = Guid.NewGuid(),
-                UserId = userId,
-                ProviderType = "openai",
-                Model = "gpt-4o-mini",
-                SystemPrompt = "system",
-                UserPrompt = "categorize this",
-                Purpose = "categorize",
-                ResponseRaw = "{}",
-                LatencyMs = 10,
-                Success = true,
-                CreatedAt = DateTime.UtcNow.AddMinutes(-2)
-            },
+          {
+              Id = Guid.NewGuid(),
+              UserId = userId,
+              ProviderType = "openai",
+              Model = "gpt-4o-mini",
+              SystemPrompt = "system",
+              UserPrompt = "categorize this",
+              Purpose = "categorize",
+              ResponseRaw = "{}",
+              LatencyMs = 10,
+              Success = true,
+              CreatedAt = DateTime.UtcNow.AddMinutes(-2)
+          },
           new LlmCallLog
-            {
-                Id = Guid.NewGuid(),
-                UserId = userId,
-                ProviderType = "openai",
-                Model = "gpt-4o-mini",
-                SystemPrompt = "system",
-                UserPrompt = "summarize this",
-                Purpose = "summary:dashboard",
-                ResponseRaw = "Narrative",
-                LatencyMs = 20,
-                Success = true,
-                CreatedAt = DateTime.UtcNow.AddMinutes(-1)
-            });
+          {
+              Id = Guid.NewGuid(),
+              UserId = userId,
+              ProviderType = "openai",
+              Model = "gpt-4o-mini",
+              SystemPrompt = "system",
+              UserPrompt = "summarize this",
+              Purpose = "summary:dashboard",
+              ResponseRaw = "Narrative",
+              LatencyMs = 20,
+              Success = true,
+              CreatedAt = DateTime.UtcNow.AddMinutes(-1)
+          });
 
             await dbContext.SaveChangesAsync();
         });
