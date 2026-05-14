@@ -5,5 +5,6 @@ public enum TransactionType
     TransferOut = 0,
     TransferIn = 1,
     Purchase = 2,
-    AtmWithdrawal = 3
+    AtmWithdrawal = 3,
+    Refund = 4
 }
