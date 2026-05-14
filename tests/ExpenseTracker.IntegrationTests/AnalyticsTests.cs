@@ -61,29 +61,29 @@ public sealed class AnalyticsTests(CustomWebApplicationFactory factory) : Integr
         {
             dbContext.Summaries.AddRange(
           new Summary
-            {
-                UserId = userId,
-                SummaryType = "dashboard",
-                Scope = "current",
-                CacheKey = "older",
-                Content = "Older narrative.",
-                InputSnapshot = "{}",
-                ModelUsed = "model-a",
-                ProviderUsed = "openai",
-                GeneratedAt = DateTime.UtcNow.AddMinutes(-10)
-            },
+          {
+              UserId = userId,
+              SummaryType = "dashboard",
+              Scope = "current",
+              CacheKey = "older",
+              Content = "Older narrative.",
+              InputSnapshot = "{}",
+              ModelUsed = "model-a",
+              ProviderUsed = "openai",
+              GeneratedAt = DateTime.UtcNow.AddMinutes(-10)
+          },
           new Summary
-            {
-                UserId = userId,
-                SummaryType = "dashboard",
-                Scope = "current",
-                CacheKey = "newer",
-                Content = "Latest narrative.",
-                InputSnapshot = "{}",
-                ModelUsed = "model-b",
-                ProviderUsed = "openai",
-                GeneratedAt = DateTime.UtcNow
-            });
+          {
+              UserId = userId,
+              SummaryType = "dashboard",
+              Scope = "current",
+              CacheKey = "newer",
+              Content = "Latest narrative.",
+              InputSnapshot = "{}",
+              ModelUsed = "model-b",
+              ProviderUsed = "openai",
+              GeneratedAt = DateTime.UtcNow
+          });
             await dbContext.SaveChangesAsync();
         });
 
@@ -120,89 +120,89 @@ public sealed class AnalyticsTests(CustomWebApplicationFactory factory) : Integr
         {
             dbContext.LlmCallLogs.AddRange(
           new LlmCallLog
-            {
-                Id = Guid.NewGuid(),
-                UserId = userId,
-                ProviderType = "openai",
-                Model = "gpt-4o-mini",
-                SystemPrompt = "system",
-                UserPrompt = "categorize this",
-                Purpose = "categorize",
-                ResponseRaw = "{}",
-                LatencyMs = 10,
-                Success = true,
-                CreatedAt = now.AddDays(-1)
-            },
+          {
+              Id = Guid.NewGuid(),
+              UserId = userId,
+              ProviderType = "openai",
+              Model = "gpt-4o-mini",
+              SystemPrompt = "system",
+              UserPrompt = "categorize this",
+              Purpose = "categorize",
+              ResponseRaw = "{}",
+              LatencyMs = 10,
+              Success = true,
+              CreatedAt = now.AddDays(-1)
+          },
           new LlmCallLog
-            {
-                Id = Guid.NewGuid(),
-                UserId = userId,
-                ProviderType = "openai",
-                Model = "gpt-4o-mini",
-                SystemPrompt = "system",
-                UserPrompt = "summarize this",
-                Purpose = "summary:dashboard",
-                ResponseRaw = "Narrative",
-                LatencyMs = 25,
-                Success = true,
-                CreatedAt = now.AddDays(-1)
-            },
+          {
+              Id = Guid.NewGuid(),
+              UserId = userId,
+              ProviderType = "openai",
+              Model = "gpt-4o-mini",
+              SystemPrompt = "system",
+              UserPrompt = "summarize this",
+              Purpose = "summary:dashboard",
+              ResponseRaw = "Narrative",
+              LatencyMs = 25,
+              Success = true,
+              CreatedAt = now.AddDays(-1)
+          },
           new LlmCallLog
-            {
-                Id = Guid.NewGuid(),
-                UserId = userId,
-                ProviderType = "openai",
-                Model = "gpt-4o-mini",
-                SystemPrompt = "system",
-                UserPrompt = "failed summarize this",
-                Purpose = "summary:monthly",
-                ResponseRaw = "Narrative",
-                LatencyMs = 15,
-                Success = false,
-                CreatedAt = now.AddDays(-1)
-            },
+          {
+              Id = Guid.NewGuid(),
+              UserId = userId,
+              ProviderType = "openai",
+              Model = "gpt-4o-mini",
+              SystemPrompt = "system",
+              UserPrompt = "failed summarize this",
+              Purpose = "summary:monthly",
+              ResponseRaw = "Narrative",
+              LatencyMs = 15,
+              Success = false,
+              CreatedAt = now.AddDays(-1)
+          },
           new LlmCallLog
-            {
-                Id = Guid.NewGuid(),
-                UserId = userId,
-                ProviderType = "openai",
-                Model = "gpt-4o-mini",
-                SystemPrompt = "system",
-                UserPrompt = "old call",
-                Purpose = "categorize",
-                ResponseRaw = "{}",
-                LatencyMs = 5,
-                Success = true,
-                CreatedAt = previousMonth
-            });
+          {
+              Id = Guid.NewGuid(),
+              UserId = userId,
+              ProviderType = "openai",
+              Model = "gpt-4o-mini",
+              SystemPrompt = "system",
+              UserPrompt = "old call",
+              Purpose = "categorize",
+              ResponseRaw = "{}",
+              LatencyMs = 5,
+              Success = true,
+              CreatedAt = previousMonth
+          });
 
             dbContext.Summaries.AddRange(
           new Summary
-            {
-                UserId = userId,
-                SummaryType = "dashboard",
-                Scope = "current",
-                CacheKey = "current-month",
-                Content = "Current month summary",
-                InputSnapshot = "{}",
-                ModelUsed = "gpt-4o-mini",
-                ProviderUsed = "openai",
-                TokensUsed = 123,
-                GeneratedAt = now.AddDays(-1)
-            },
+          {
+              UserId = userId,
+              SummaryType = "dashboard",
+              Scope = "current",
+              CacheKey = "current-month",
+              Content = "Current month summary",
+              InputSnapshot = "{}",
+              ModelUsed = "gpt-4o-mini",
+              ProviderUsed = "openai",
+              TokensUsed = 123,
+              GeneratedAt = now.AddDays(-1)
+          },
           new Summary
-            {
-                UserId = userId,
-                SummaryType = "dashboard",
-                Scope = "previous",
-                CacheKey = "previous-month",
-                Content = "Previous month summary",
-                InputSnapshot = "{}",
-                ModelUsed = "gpt-4o-mini",
-                ProviderUsed = "openai",
-                TokensUsed = 999,
-                GeneratedAt = previousMonth
-            });
+          {
+              UserId = userId,
+              SummaryType = "dashboard",
+              Scope = "previous",
+              CacheKey = "previous-month",
+              Content = "Previous month summary",
+              InputSnapshot = "{}",
+              ModelUsed = "gpt-4o-mini",
+              ProviderUsed = "openai",
+              TokensUsed = 999,
+              GeneratedAt = previousMonth
+          });
 
             await dbContext.SaveChangesAsync();
         });
