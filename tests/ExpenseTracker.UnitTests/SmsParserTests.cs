@@ -94,4 +94,37 @@ public sealed class SmsParserTests
         result!.Amount.Should().Be(1234.56m);
         result.TransactionDate.Kind.Should().Be(DateTimeKind.Utc);
     }
+
+    [Fact]
+    public void Parse_ShouldParseStornoSpletTelAsCreditRefund()
+    {
+        var sms = "STORNO SPLET/TEL 12.05.2026 11:47, kartica ***3306, znesek 1,00 EUR, GOOGLE*YOUTUBEPREMIUM, LONDON GB. Info: +38615834183. OTP banka";
+
+        var result = _parser.Parse(sms);
+
+        result.Should().NotBeNull();
+        result!.Direction.Should().Be(Direction.Credit);
+        result.TransactionType.Should().Be(TransactionType.Refund);
+        result.Amount.Should().Be(1.00m);
+        result.Currency.Should().Be("EUR");
+        result.TransactionDate.Should().Be(new DateTime(2026, 5, 12, 11, 47, 0, DateTimeKind.Utc));
+        result.MerchantRaw.Should().Be("GOOGLE*YOUTUBEPREMIUM");
+        result.Notes.Should().BeNull();
+    }
+
+    [Fact]
+    public void Parse_ShouldParseStornoPosAsCreditRefund()
+    {
+        var sms = "STORNO POS 10.05.2026 09:30, kartica ***1234, znesek 25,50 EUR, MERCATOR MARIBOR SI. Info: 041123456. OTP banka";
+
+        var result = _parser.Parse(sms);
+
+        result.Should().NotBeNull();
+        result!.Direction.Should().Be(Direction.Credit);
+        result.TransactionType.Should().Be(TransactionType.Refund);
+        result.Amount.Should().Be(25.50m);
+        result.TransactionDate.Should().Be(new DateTime(2026, 5, 10, 9, 30, 0, DateTimeKind.Utc));
+        result.MerchantRaw.Should().Be("MERCATOR MARIBOR SI");
+        result.Notes.Should().BeNull();
+    }
 }

@@ -43,12 +43,31 @@ public sealed class InvestmentAnalyticsService(AppDbContext dbContext)
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var yesterday = today.AddDays(-1);
 
-        var todayValue = await dbContext.PortfolioHistories
-          .Where(h => h.Account.UserId == userId && h.SnapshotDate == today)
-          .SumAsync(h => (decimal?)h.MarketValue, ct) ?? totalValue;
+        // Always use the live totalValue for "today" — portfolio history snapshots may be
+        // partial (e.g. only one account was snapshotted so far today), which would produce
+        // a misleading day-change.  Fall back to the most recent full snapshot if there is
+        // no snapshot for yesterday specifically.
+        var todayValue = totalValue;
         var yesterdayValue = await dbContext.PortfolioHistories
           .Where(h => h.Account.UserId == userId && h.SnapshotDate == yesterday)
           .SumAsync(h => (decimal?)h.MarketValue, ct);
+
+        // If no snapshot for yesterday, try to find the most recent snapshot before today
+        if (!yesterdayValue.HasValue)
+        {
+            var mostRecentDate = await dbContext.PortfolioHistories
+              .Where(h => h.Account.UserId == userId && h.SnapshotDate < today)
+              .OrderByDescending(h => h.SnapshotDate)
+              .Select(h => (DateOnly?)h.SnapshotDate)
+              .FirstOrDefaultAsync(ct);
+
+            if (mostRecentDate.HasValue)
+            {
+                yesterdayValue = await dbContext.PortfolioHistories
+                  .Where(h => h.Account.UserId == userId && h.SnapshotDate == mostRecentDate.Value)
+                  .SumAsync(h => (decimal?)h.MarketValue, ct);
+            }
+        }
 
         decimal? dayChange = yesterdayValue.HasValue ? todayValue - yesterdayValue.Value : null;
         decimal? dayChangePercent = yesterdayValue.HasValue && yesterdayValue.Value != 0

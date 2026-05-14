@@ -20,6 +20,10 @@ public sealed class OtpBankaSmsParser
         @"^(?:POS|SPLET/TEL|SPLET) NAKUP (\d{2}\.\d{2}\.\d{4})\s+(\d{2}:\d{2}),\s*kartica\s*\*{3}\d+,\s*znesek\s*([\d,.]+)\s*EUR,\s*(.+?)(?:,\s*\w+\s+\w{2})?\.?\s*Info:",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
+    private static readonly Regex StornoRegex = new(
+        @"^STORNO\s+(?:POS|SPLET/TEL|SPLET)\s+(\d{2}\.\d{2}\.\d{4})\s+(\d{2}:\d{2}),\s*kartica\s*\*{3}\d+,\s*znesek\s*([\d,.]+)\s*EUR,\s*(.+?)(?:,\s*\w+\s+\w{2})?\.?\s*Info:",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
     public ParsedSms? Parse(string body)
     {
         if (string.IsNullOrWhiteSpace(body))
@@ -39,6 +43,12 @@ public sealed class OtpBankaSmsParser
             return CreateTransferResult(transferInMatch, Direction.Credit, TransactionType.TransferIn);
         }
 
+        var stornoMatch = StornoRegex.Match(body);
+        if (stornoMatch.Success)
+        {
+            return CreateCardResult(stornoMatch, Direction.Credit, TransactionType.Refund);
+        }
+
         var purchaseMatch = PurchaseRegex.Match(body);
         if (!purchaseMatch.Success)
         {
@@ -55,6 +65,26 @@ public sealed class OtpBankaSmsParser
         return new ParsedSms(
             Direction.Debit,
             TransactionType.Purchase,
+            amount,
+            "EUR",
+            transactionDate,
+            merchantRaw,
+            MerchantNormalizer.Normalize(merchantRaw),
+            null);
+    }
+
+    private static ParsedSms? CreateCardResult(Match match, Direction direction, TransactionType type)
+    {
+        if (!TryParseDateTime(match.Groups[1].Value, match.Groups[2].Value, out var transactionDate) ||
+            !TryParseAmount(match.Groups[3].Value, out var amount))
+        {
+            return null;
+        }
+
+        var merchantRaw = match.Groups[4].Value.Trim();
+        return new ParsedSms(
+            direction,
+            type,
             amount,
             "EUR",
             transactionDate,
